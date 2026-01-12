@@ -1,0 +1,175 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-py"
+  interface = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Role {
+  citizen
+  clerk
+  admin
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum RequestStatus {
+  pending
+  approved
+  rejected
+}
+
+enum CertStatus {
+  pending
+  approved
+  rejected
+}
+
+enum ComplaintStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+// 1. Users Table
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password_hash String
+  role          Role      @default(citizen)
+  full_name     String
+  mobile        String?
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  // Relations
+  profile            CitizenProfile?
+  certificates       Certificate[]
+  complaints         Complaint[]
+  assigned_complaints Complaint[]    @relation("AssignedTo")
+  schemes_created    Scheme[]
+  notices            Notice[]
+  
+  // Admin actions
+  reviewed_requests  RegistrationRequest[] @relation("ReviewedBy")
+  processed_certs    Certificate[]        @relation("CertProcessedBy")
+}
+
+// 2. Registration Requests (For public signups)
+model RegistrationRequest {
+  id              String        @id @default(uuid())
+  full_name       String
+  date_of_birth   DateTime
+  gender          Gender
+  aadhaar_number  String        @unique
+  email           String        @unique
+  mobile          String
+  address         String        @db.Text
+  village         String        @default("Sarahi")
+  pincode         String
+  password_hash   String
+  status          RequestStatus @default(pending)
+  
+  submitted_at    DateTime      @default(now())
+  reviewed_at     DateTime?
+  reviewed_by_id  String?
+  rejection_reason String?       @db.Text
+
+  reviewer        User?         @relation("ReviewedBy", fields: [reviewed_by_id], references: [id])
+}
+
+// 3. Citizen Profiles (Extended info for users)
+model CitizenProfile {
+  id             String    @id @default(uuid())
+  user_id        String    @unique
+  aadhaar_number String    @unique
+  date_of_birth  DateTime?
+  gender         Gender?
+  address        String?   @db.Text
+  village        String?
+  pincode        String?
+
+  user           User      @relation(fields: [user_id], references: [id])
+}
+
+// 4. Certificates
+model Certificate {
+  id                 String     @id @default(uuid())
+  application_number String     @unique // e.g., CERT-2026-001
+  citizen_id         String
+  certificate_type   String     // birth, death, income, residence
+  
+  // Flexible JSON field to store type-specific data (child_name, income_amount, etc.)
+  data               Json
+  
+  purpose            String     @db.Text
+  status             CertStatus @default(pending)
+  submitted_at       DateTime   @default(now())
+  
+  processed_at       DateTime?
+  processed_by_id    String?
+  remarks            String?    @db.Text
+  certificate_url    String?    // PDF link
+
+  citizen      User  @relation(fields: [citizen_id], references: [id])
+  processor    User? @relation("CertProcessedBy", fields: [processed_by_id], references: [id])
+}
+
+// 6. Complaints
+model Complaint {
+  id               String          @id @default(uuid())
+  complaint_number String          @unique
+  citizen_id       String
+  complaint_type   String          // water, road, electricity
+  subject          String
+  description      String          @db.Text
+  location         String?
+  status           ComplaintStatus @default(open)
+  priority         String          @default("medium") // low, medium, high
+  
+  assigned_to_id   String?
+  submitted_at     DateTime        @default(now())
+  resolved_at      DateTime?
+
+  citizen      User  @relation(fields: [citizen_id], references: [id])
+  assignee     User? @relation("AssignedTo", fields: [assigned_to_id], references: [id])
+}
+
+// 9. Schemes
+model Scheme {
+  id           String    @id @default(uuid())
+  scheme_name  String
+  description  String    @db.Text
+  is_active    Boolean   @default(true)
+  created_by_id String
+  
+  created_at   DateTime  @default(now())
+  creator      User      @relation(fields: [created_by_id], references: [id])
+}
+
+// 11. Notices
+model Notice {
+  id           String    @id @default(uuid())
+  title        String
+  content      String    @db.Text
+  notice_type  String    // important, update, success
+  is_published Boolean   @default(false)
+  expiry_date  DateTime?
+  created_at   DateTime  @default(now())
+  
+  created_by_id String
+  creator       User     @relation(fields: [created_by_id], references: [id])
+}
