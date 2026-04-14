@@ -1,0 +1,13 @@
+{
+  "name": "panchayat-backend",
+  "version": "1.0.0",
+  "description": "Backend for Village Panchayat Management System",
+  "main": "app/main.py",
+  "scripts": {
+    "dev": "python -m uvicorn app.main:app --reload",
+    "start": "python -m uvicorn app.main:app"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

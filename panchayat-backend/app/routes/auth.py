@@ -52,10 +52,13 @@ async def register_citizen(data: CitizenRegister):
 
 @router.post("/login")
 async def login(data: LoginRequest):
+    print(f"[LOGIN DEBUG] Received: email={data.email}, role={data.role}, password_len={len(data.password)}")
+    
     # Logic for citizen login
     if data.role == "citizen":
         # 1. Check if ACTIVE user exists
         user = await db.user.find_unique(where={'email': data.email})
+        print(f"[LOGIN DEBUG] Citizen user found: {user is not None}")
         
         if not user:
             # 2. Check if Approved Request exists but user entry missing (edge case) or Pending
@@ -68,7 +71,9 @@ async def login(data: LoginRequest):
             
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not verify_password(data.password, user.password_hash):
+        pwd_match = verify_password(data.password, user.password_hash)
+        print(f"[LOGIN DEBUG] Password match: {pwd_match}")
+        if not pwd_match:
              raise HTTPException(status_code=401, detail="Invalid credentials")
              
         # Generate Token
@@ -78,11 +83,17 @@ async def login(data: LoginRequest):
     else:
         # Admin / Clerk Login
         user = await db.user.find_unique(where={'email': data.email})
+        print(f"[LOGIN DEBUG] Admin/Clerk user found: {user is not None}")
+        if user:
+            print(f"[LOGIN DEBUG] User role in DB: '{user.role}', requested role: '{data.role}'")
         
         if not user or user.role != data.role:
+            print(f"[LOGIN DEBUG] REJECTED: user not found or role mismatch")
             raise HTTPException(status_code=401, detail="Invalid credentials or incorrect role selected")
             
-        if not verify_password(data.password, user.password_hash):
+        pwd_match = verify_password(data.password, user.password_hash)
+        print(f"[LOGIN DEBUG] Password match: {pwd_match}")
+        if not pwd_match:
              raise HTTPException(status_code=401, detail="Invalid credentials")
              
         # Generate Token
