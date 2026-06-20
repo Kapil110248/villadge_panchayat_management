@@ -1,13 +1,32 @@
+"use client";
+
+import { useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Navbar } from "@/components/layout/Navbar";
 
 export default function AdminLayout({ children }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <Sidebar role="admin" />
-      <div className="flex-1 flex flex-col">
-        <Navbar role="admin" />
-        <main className="p-6">
+    <div className="flex min-h-screen bg-slate-50 relative">
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+      
+      {/* Sidebar - hidden on mobile unless open */}
+      <div className={`print:hidden fixed inset-y-0 left-0 z-50 transform lg:transform-none lg:static transition-transform duration-300 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <Sidebar role="admin" onClose={() => setMobileMenuOpen(false)} />
+      </div>
+
+      <div className="flex-1 flex flex-col w-full lg:w-auto print:block">
+        <div className="print:hidden">
+          <Navbar role="admin" onMenuClick={() => setMobileMenuOpen(true)} />
+        </div>
+        <main className="p-4 md:p-6 w-full max-w-[100vw] overflow-x-hidden print:p-0">
           {children}
         </main>
       </div>

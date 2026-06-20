@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { api } from "@/lib/api";
 import { 
   UserCheck, 
   UserX, 
@@ -29,40 +30,41 @@ export default function RegistrationRequestsPage() {
     loadRequests();
   }, []);
 
-  const loadRequests = () => {
-    const stored = localStorage.getItem("registrationRequests");
-    if (stored) {
-      setRequests(JSON.parse(stored));
+  const loadRequests = async () => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      const data = await api.get("/admin/registration-requests", token);
+      setRequests(data.requests);
+    } catch (error) {
+      console.error("Failed to load requests:", error);
     }
   };
 
-  const handleApprove = (requestId) => {
-    const updated = requests.map(req => 
-      req.id === requestId 
-        ? { ...req, status: "approved", reviewedAt: new Date().toISOString() }
-        : req
-    );
-    setRequests(updated);
-    localStorage.setItem("registrationRequests", JSON.stringify(updated));
-    setSelectedRequest(null);
+  const handleApprove = async (requestId) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      await api.post(`/admin/registration-requests/${requestId}/approve`, {}, token);
+      loadRequests();
+    } catch (error) {
+      alert("Error approving request: " + error.message);
+    }
   };
 
-  const handleReject = (requestId) => {
-    const updated = requests.map(req => 
-      req.id === requestId 
-        ? { ...req, status: "rejected", reviewedAt: new Date().toISOString() }
-        : req
-    );
-    setRequests(updated);
-    localStorage.setItem("registrationRequests", JSON.stringify(updated));
-    setSelectedRequest(null);
+  const handleReject = async (requestId) => {
+    try {
+      const token = localStorage.getItem("accessToken");
+      await api.post(`/admin/registration-requests/${requestId}/reject`, {}, token);
+      loadRequests();
+    } catch (error) {
+      alert("Error rejecting request: " + error.message);
+    }
   };
 
   const filteredRequests = requests.filter(req => {
     const matchesFilter = filter === "all" || req.status === filter;
-    const matchesSearch = req.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         req.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         req.aadhaarNumber.includes(searchTerm);
+    const matchesSearch = req.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         req.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         req.aadhaar_number?.includes(searchTerm);
     return matchesFilter && matchesSearch;
   });
 
@@ -179,7 +181,7 @@ export default function RegistrationRequestsPage() {
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-2xl font-black text-slate-900 mb-1">
-                        {request.fullName}
+                        {request.full_name}
                       </h3>
                       <div className="flex items-center gap-2">
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase ${
@@ -195,7 +197,7 @@ export default function RegistrationRequestsPage() {
                           {request.status}
                         </span>
                         <span className="text-xs text-slate-400 font-medium">
-                          Submitted: {new Date(request.submittedAt).toLocaleDateString('en-IN')}
+                          Submitted: {new Date(request.submitted_at).toLocaleDateString('en-IN')}
                         </span>
                       </div>
                     </div>
@@ -228,7 +230,7 @@ export default function RegistrationRequestsPage() {
                       </div>
                       <div>
                         <p className="text-xs font-black text-slate-400 uppercase">Aadhaar</p>
-                        <p className="text-sm font-bold text-slate-900">{request.aadhaarNumber}</p>
+                        <p className="text-sm font-bold text-slate-900">{request.aadhaar_number}</p>
                       </div>
                     </div>
 
@@ -239,7 +241,7 @@ export default function RegistrationRequestsPage() {
                       <div>
                         <p className="text-xs font-black text-slate-400 uppercase">Date of Birth</p>
                         <p className="text-sm font-bold text-slate-900">
-                          {new Date(request.dateOfBirth).toLocaleDateString('en-IN')}
+                          {new Date(request.date_of_birth).toLocaleDateString('en-IN')}
                         </p>
                       </div>
                     </div>
@@ -294,7 +296,7 @@ export default function RegistrationRequestsPage() {
                         )}
                       </div>
                       <p className="text-xs font-bold text-slate-400">
-                        {new Date(request.reviewedAt).toLocaleDateString('en-IN')}
+                        {request.reviewed_at ? new Date(request.reviewed_at).toLocaleDateString('en-IN') : ""}
                       </p>
                     </div>
                   </div>

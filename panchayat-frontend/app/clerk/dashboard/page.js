@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import { api } from "@/lib/api";
 import { 
   Users, 
   FileCheck, 
@@ -15,11 +17,45 @@ import {
 import { Button } from "@/components/ui/Button";
 
 export default function ClerkDashboard() {
+  const [dashboardData, setDashboardData] = useState({
+    stats: {
+      total_citizens: 0,
+      pending_review: 0,
+      processed: 0,
+      grievances: 0
+    },
+    action_required: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        if (!token) return;
+        const res = await api.get("/clerk/dashboard/stats", token);
+        if (res) {
+          setDashboardData(res);
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  // Calculate completion percentage dynamically
+  const totalTasks = dashboardData.stats.pending_review + dashboardData.stats.processed + dashboardData.stats.grievances;
+  const completionPct = totalTasks === 0 ? 100 : Math.round((dashboardData.stats.processed / totalTasks) * 100);
+  const strokeDashoffset = 364 - (364 * completionPct / 100);
+
   const stats = [
-    { label: "Total Citizens", value: "1,240", icon: Users, color: "text-blue-600", bg: "bg-blue-500/10" },
-    { label: "PendingReview", value: "12", icon: Zap, color: "text-amber-600", bg: "bg-amber-500/10" },
-    { label: "Processed", value: "8", icon: FileCheck, color: "text-emerald-600", bg: "bg-emerald-500/10" },
-    { label: "Grievances", value: "5", icon: MessageCircle, color: "text-rose-600", bg: "bg-rose-500/10" },
+    { label: "Total Citizens", value: dashboardData.stats.total_citizens.toLocaleString(), icon: Users, color: "text-blue-600", bg: "bg-blue-500/10" },
+    { label: "PendingReview", value: dashboardData.stats.pending_review.toString(), icon: Zap, color: "text-amber-600", bg: "bg-amber-500/10" },
+    { label: "Processed", value: dashboardData.stats.processed.toString(), icon: FileCheck, color: "text-emerald-600", bg: "bg-emerald-500/10" },
+    { label: "Grievances", value: dashboardData.stats.grievances.toString(), icon: MessageCircle, color: "text-rose-600", bg: "bg-rose-500/10" },
   ];
 
   return (
@@ -31,9 +67,6 @@ export default function ClerkDashboard() {
           </div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Karmachari <span className="text-primary">Dashboard</span></h1>
           <p className="text-slate-500 font-medium mt-1">Ready to serve the citizens. 12 pending tasks require your attention.</p>
-        </div>
-        <div className="flex gap-3">
-           <Button variant="secondary" className="gap-2"><Search className="w-4 h-4" /> Quick Search</Button>
         </div>
       </div>
 
@@ -69,11 +102,15 @@ export default function ClerkDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {[
-                    { name: "Suresh Meena", type: "Income Cert.", urgency: "High", color: "text-rose-600" },
-                    { name: "Anita Devi", type: "Residence Cert.", urgency: "Med", color: "text-amber-600" },
-                    { name: "Rajesh Soni", type: "Complaint Update", urgency: "Low", color: "text-blue-600" },
-                  ].map((task, i) => (
+                  {loading ? (
+                    <tr>
+                      <td colSpan="4" className="px-8 py-6 text-center text-slate-500 text-sm font-bold animate-pulse">Loading Tasks...</td>
+                    </tr>
+                  ) : dashboardData.action_required.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="px-8 py-6 text-center text-slate-500 text-sm font-bold">No pending tasks! Good job.</td>
+                    </tr>
+                  ) : dashboardData.action_required.map((task, i) => (
                     <tr key={i} className="group hover:bg-slate-50/50 transition-colors">
                       <td className="px-8 py-6">
                         <div className="font-bold text-slate-900">{task.name}</div>
@@ -102,24 +139,32 @@ export default function ClerkDashboard() {
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Shift Progress</p>
            </CardHeader>
            <CardContent className="space-y-8">
-              <div className="flex flex-col items-center justify-center p-6 border-2 border-white/10 rounded-3xl relative">
+               <div className="flex flex-col items-center justify-center p-6 border-2 border-white/10 rounded-3xl relative">
                  <svg className="w-32 h-32 rotate-[-90deg]">
                     <circle cx="64" cy="64" r="58" fill="none" stroke="currentColor" strokeWidth="12" className="text-white/10" />
-                    <circle cx="64" cy="64" r="58" fill="none" stroke="currentColor" strokeWidth="12" strokeDasharray="364" strokeDashoffset="109" className="text-primary" />
+                    <circle cx="64" cy="64" r="58" fill="none" stroke="currentColor" strokeWidth="12" strokeDasharray="364" strokeDashoffset={strokeDashoffset} className="text-primary transition-all duration-1000" />
                  </svg>
                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-black">70%</span>
+                    <span className="text-3xl font-black">{completionPct}%</span>
                     <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Done</span>
                  </div>
               </div>
               <div className="space-y-4">
                  <div className="flex justify-between items-center text-xs font-bold uppercase">
-                    <span className="text-slate-400 tracking-wider">Reports Ready</span>
-                    <span className="text-emerald-400">Done</span>
+                    <span className="text-slate-400 tracking-wider">Pending Review</span>
+                    {dashboardData.stats.pending_review === 0 ? (
+                      <span className="text-emerald-400">Done</span>
+                    ) : (
+                      <span className="text-amber-400 italic">{dashboardData.stats.pending_review} Left</span>
+                    )}
                  </div>
                  <div className="flex justify-between items-center text-xs font-bold uppercase">
-                    <span className="text-slate-400 tracking-wider">Citizen Meetup</span>
-                    <span className="text-amber-400 italic">Pending</span>
+                    <span className="text-slate-400 tracking-wider">Open Grievances</span>
+                    {dashboardData.stats.grievances === 0 ? (
+                      <span className="text-emerald-400">Clear</span>
+                    ) : (
+                      <span className="text-rose-400 italic">{dashboardData.stats.grievances} Left</span>
+                    )}
                  </div>
               </div>
               <Button className="w-full py-6 bg-white/10 hover:bg-white/20 border-none text-white rounded-2xl">Start Evening Shift</Button>

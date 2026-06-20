@@ -42,8 +42,14 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Gram Panchayat API", "status": "running"}
+    return {"message": "Welcome to Gram Panchayat API - V2", "status": "running"}
 
 from app.routes import auth
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+
+from app.routes import admin
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+
+from app.routes import modules
+app.include_router(modules.router, prefix="/api", tags=["Modules"])
 

@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
 
 export const api = {
   // Helper for GET requests
@@ -47,6 +47,22 @@ export const api = {
       method: "PUT",
       headers,
       body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  // Helper for DELETE requests
+  delete: async (endpoint, token = null) => {
+    const headers = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "DELETE",
+      headers,
     });
     return handleResponse(response);
   },

@@ -33,6 +33,16 @@ const getLinks = (role) => {
     { name: "My Complaints", href: "/citizen/complaints/status", icon: ClipboardCheck },
     { name: "Government Schemes", href: "/citizen/schemes", icon: BookOpen },
     { name: "My Profile", href: "/citizen/profile", icon: User },
+    { name: "Gram Sabha", href: "/citizen/gram-sabha", icon: Users },
+    { name: "Development Works", href: "/citizen/development", icon: LayoutDashboard },
+    { name: "Water Supply", href: "/citizen/water-supply", icon: ClipboardCheck },
+    { name: "Tax Center", href: "/citizen/taxes", icon: FileText },
+    { name: "Village Directory", href: "/citizen/directory", icon: Users },
+    { name: "Suggestions Box", href: "/citizen/suggestions", icon: Sparkles },
+    { name: "Ration Schedule", href: "/citizen/ration", icon: BookOpen },
+    { name: "Health Camps", href: "/citizen/health-camps", icon: ClipboardCheck },
+    { name: "Agriculture Center", href: "/citizen/agriculture", icon: BookOpen },
+    { name: "Digital Village Map", href: "/citizen/map", icon: FileSearch },
   ];
 
   const clerkLinks = [
@@ -41,6 +51,13 @@ const getLinks = (role) => {
     { name: "Certificate Verification", href: "/clerk/verification", icon: ClipboardCheck },
     { name: "Grievances", href: "/clerk/complaints", icon: MessageSquare },
     { name: "Profile Settings", href: "/clerk/profile", icon: User },
+    { name: "Gram Sabha", href: "/clerk/gram-sabha", icon: Users },
+    { name: "Development Works", href: "/clerk/development", icon: LayoutDashboard },
+    { name: "Water Supply", href: "/clerk/water-supply", icon: ClipboardCheck },
+    { name: "Tax Center", href: "/clerk/taxes", icon: FileText },
+    { name: "Village Directory", href: "/clerk/directory", icon: Users },
+    { name: "Assets Ledger", href: "/clerk/assets", icon: FileSearch },
+    { name: "Staff Attendance", href: "/clerk/attendance", icon: ClipboardCheck },
   ];
 
   const adminLinks = [
@@ -54,14 +71,28 @@ const getLinks = (role) => {
     { name: "System Reports", href: "/admin/reports", icon: PieChart },
     { name: "Portal Settings", href: "/admin/settings", icon: Settings },
     { name: "My Admin Profile", href: "/admin/profile", icon: User },
+    { name: "Gram Sabha", href: "/admin/gram-sabha", icon: Users },
+    { name: "Development Works", href: "/admin/development", icon: LayoutDashboard },
+    { name: "Water Supply", href: "/admin/water-supply", icon: ClipboardCheck },
+    { name: "Tax Center", href: "/admin/taxes", icon: FileText },
+    { name: "Village Directory", href: "/admin/directory", icon: Users },
+    { name: "Suggestions Box", href: "/admin/suggestions", icon: Sparkles },
+    { name: "Ration Schedule", href: "/admin/ration", icon: BookOpen },
+    { name: "Health Camps", href: "/admin/health-camps", icon: ClipboardCheck },
+    { name: "Assets Ledger", href: "/admin/assets", icon: FileSearch },
+    { name: "Staff Attendance", href: "/admin/attendance", icon: ClipboardCheck },
   ];
 
-  if (role === "admin") return [...adminLinks, ...common];
-  if (role === "clerk") return [...clerkLinks, ...common];
-  return [...citizenLinks, ...common];
+  const allLinks = role === "admin" ? [...adminLinks, ...common] : 
+                   role === "clerk" ? [...clerkLinks, ...common] : 
+                   [...citizenLinks, ...common];
+  
+  return allLinks.filter((link, index, self) => 
+    index === self.findIndex((t) => t.href === link.href)
+  );
 };
 
-export function Sidebar({ role = "citizen" }) {
+export function Sidebar({ role = "citizen", onClose }) {
   const pathname = usePathname();
   const links = getLinks(role);
 
@@ -86,6 +117,7 @@ export function Sidebar({ role = "citizen" }) {
               <Link
                 key={link.href}
                 href={link.href}
+                onClick={() => onClose?.()}
                 className={cn(
                   "flex items-center gap-3.5 px-4 py-3 rounded-2xl text-sm font-bold transition-all duration-300 group relative cursor-pointer active:scale-95",
                   isActive

@@ -119,11 +119,10 @@ export default function LoginPage() {
               <div className="flex flex-col gap-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Email / Mobile</label>
                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
                       placeholder="e.g. user@gram.in"
-                      className="w-full bg-slate-100 border-2 border-transparent pl-12 pr-4 py-3.5 text-sm font-semibold rounded-2xl transition-all focus:bg-white focus:border-primary/20 outline-none"
+                      className="w-full bg-slate-100 border-2 border-transparent px-4 py-3.5 text-sm font-semibold rounded-2xl transition-all focus:bg-white focus:border-primary/20 outline-none"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -134,11 +133,10 @@ export default function LoginPage() {
               <div className="flex flex-col gap-2">
                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Secret PIN / Password</label>
                  <div className="relative">
-                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
                       type="password"
                       placeholder="••••••••"
-                      className="w-full bg-slate-100 border-2 border-transparent pl-12 pr-4 py-3.5 text-sm font-semibold rounded-2xl transition-all focus:bg-white focus:border-primary/20 outline-none"
+                      className="w-full bg-slate-100 border-2 border-transparent px-4 py-3.5 text-sm font-semibold rounded-2xl transition-all focus:bg-white focus:border-primary/20 outline-none"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required

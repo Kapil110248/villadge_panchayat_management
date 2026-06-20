@@ -1,6 +1,8 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
+import Link from "next/link";
 import { 
   BarChart3, 
   Users, 
@@ -14,14 +16,99 @@ import {
   Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { api } from "@/lib/api";
 
 export default function AdminDashboard() {
-  const stats = [
-    { label: "Revenue", value: "₹4.2L", icon: BarChart3, change: "+8.2%", trend: "up", color: "text-blue-600", bg: "bg-blue-500/10" },
-    { label: "Citizens", value: "8,450", icon: Users, change: "+2.4%", trend: "up", color: "text-indigo-600", bg: "bg-indigo-500/10" },
-    { label: "Approvals", value: "24", icon: ShieldCheck, change: "-12%", trend: "down", color: "text-amber-600", bg: "bg-amber-500/10" },
-    { label: "Alerts", value: "15", icon: Sparkles, change: "+4%", trend: "up", color: "text-rose-600", bg: "bg-rose-500/10" },
-  ];
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("Adhikari");
+
+  const handleExport = () => {
+    if (!dashboardData) return;
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + "Metric,Value\n"
+      + `Total Citizens,${dashboardData.stats.total_citizens}\n`
+      + `Pending Approvals,${dashboardData.stats.pending_approvals}\n`
+      + `Open Complaints,${dashboardData.stats.open_complaints}\n`
+      + `Total Certificates,${dashboardData.stats.total_certificates}\n`
+      + `Complaint Resolution %,${dashboardData.health.complaint_resolve_pct}\n`
+      + `Scheme Utilization %,${dashboardData.health.scheme_util_pct}\n`;
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "panchayat_analytics.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  useEffect(() => {
+    const storedName = localStorage.getItem("userName");
+    if (storedName) setUserName(storedName.split(" ")[0]); // Use first name
+
+    const fetchDashboard = async () => {
+      try {
+        const token = localStorage.getItem("accessToken");
+        const data = await api.get("/admin/dashboard", token);
+        setDashboardData(data);
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  const stats = dashboardData
+    ? [
+        {
+          label: "Citizens",
+          value: dashboardData.stats.total_citizens.toLocaleString(),
+          icon: Users,
+          change: "Live",
+          trend: "up",
+          color: "text-indigo-600",
+          bg: "bg-indigo-500/10",
+        },
+        {
+          label: "Approvals Pending",
+          value: dashboardData.stats.pending_approvals,
+          icon: ShieldCheck,
+          change: dashboardData.stats.pending_approvals > 0 ? "Action Needed" : "All Clear",
+          trend: dashboardData.stats.pending_approvals > 0 ? "down" : "up",
+          color: "text-amber-600",
+          bg: "bg-amber-500/10",
+        },
+        {
+          label: "Open Complaints",
+          value: dashboardData.stats.open_complaints,
+          icon: Sparkles,
+          change: dashboardData.stats.open_complaints > 5 ? "High" : "Normal",
+          trend: dashboardData.stats.open_complaints > 5 ? "down" : "up",
+          color: "text-rose-600",
+          bg: "bg-rose-500/10",
+        },
+        {
+          label: "Certificates",
+          value: dashboardData.stats.total_certificates,
+          icon: BarChart3,
+          change: "Total",
+          trend: "up",
+          color: "text-blue-600",
+          bg: "bg-blue-500/10",
+        },
+      ]
+    : [
+        { label: "Citizens", value: "---", icon: Users, change: "...", trend: "up", color: "text-indigo-600", bg: "bg-indigo-500/10" },
+        { label: "Approvals Pending", value: "---", icon: ShieldCheck, change: "...", trend: "up", color: "text-amber-600", bg: "bg-amber-500/10" },
+        { label: "Open Complaints", value: "---", icon: Sparkles, change: "...", trend: "up", color: "text-rose-600", bg: "bg-rose-500/10" },
+        { label: "Certificates", value: "---", icon: BarChart3, change: "...", trend: "up", color: "text-blue-600", bg: "bg-blue-500/10" },
+      ];
+
+  const complaintPct = dashboardData?.health?.complaint_resolve_pct ?? 0;
+  const schemePct = dashboardData?.health?.scheme_util_pct ?? 0;
 
   return (
     <div className="space-y-10">
@@ -30,13 +117,15 @@ export default function AdminDashboard() {
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest">
              <ShieldCheck className="w-3 h-3" /> System Administrator
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">Sarpanch Ji, <br /> <span className="text-primary italic">Aapka Swagat Hai.</span></h1>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">{userName} Ji, <br /> <span className="text-primary italic">Aapka Swagat Hai.</span></h1>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button variant="secondary" className="rounded-2xl border-slate-200">Export Analytics</Button>
-          <Button className="bg-slate-900 shadow-2xl shadow-slate-300">
-             <Plus className="w-5 h-5 mr-2" /> Global Notice
-          </Button>
+          <Button variant="secondary" className="rounded-2xl border-slate-200" onClick={handleExport}>Export Analytics</Button>
+          <Link href="/admin/notices">
+            <Button className="bg-slate-900 shadow-2xl shadow-slate-300">
+               <Plus className="w-5 h-5 mr-2" /> Global Notice
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -52,7 +141,7 @@ export default function AdminDashboard() {
                 </div>
              </div>
              <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-             <h3 className="text-3xl font-black text-slate-900">{stat.value}</h3>
+             <h3 className={`text-3xl font-black text-slate-900 ${loading ? "animate-pulse" : ""}`}>{stat.value}</h3>
           </Card>
         ))}
       </div>
@@ -60,18 +149,55 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <Card className="xl:col-span-2 relative overflow-hidden group">
           <CardHeader 
-            title="Village Performance Overvie" 
+            title="Village Performance Overview" 
             subtitle="Complaint resolution vs Scheme application trends" 
           />
           <CardContent>
-            <div className="h-80 bg-slate-50/50 rounded-[2.5rem] border border-dashed border-slate-200 flex items-center justify-center p-8 relative overflow-hidden group-hover:border-primary/30 transition-all">
-               <div className="text-center space-y-4 group-hover:scale-105 transition-transform duration-500">
-                  <Globe className="w-16 h-16 text-slate-200 mx-auto" />
-                  <p className="text-slate-400 text-sm font-bold uppercase tracking-widest italic">Live Spatial Data Visualization Coming Soon</p>
-                </div>
-                <div className="absolute top-10 left-10 w-32 h-0.5 bg-primary/10 rounded-full pointer-events-none" />
-                <div className="absolute bottom-10 right-10 w-32 h-0.5 bg-blue-500/10 rounded-full pointer-events-none" />
-             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+              {/* Recent Registrations */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 mb-4">
+                   <Users className="w-4 h-4" /> New Registrations
+                </h4>
+                {dashboardData?.recent_registrations?.length > 0 ? (
+                  dashboardData.recent_registrations.map((req) => (
+                    <div key={req.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-primary/30 transition-colors">
+                      <div>
+                        <p className="font-bold text-sm text-slate-900">{req.full_name}</p>
+                        <p className="text-xs text-slate-500">{new Date(req.submitted_at).toLocaleDateString()}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider ${req.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {req.status}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400 italic">No recent registrations</p>
+                )}
+              </div>
+
+              {/* Recent Complaints */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 mb-4">
+                   <Sparkles className="w-4 h-4" /> Recent Complaints
+                </h4>
+                {dashboardData?.recent_complaints?.length > 0 ? (
+                  dashboardData.recent_complaints.map((comp) => (
+                    <div key={comp.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-primary/30 transition-colors">
+                      <div>
+                        <p className="font-bold text-sm text-slate-900 truncate max-w-[150px]">{comp.subject}</p>
+                        <p className="text-xs text-slate-500 capitalize">{comp.complaint_type}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider ${comp.status === 'open' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {comp.status}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400 italic">No recent complaints</p>
+                )}
+              </div>
+            </div>
            </CardContent>
         </Card>
 
@@ -84,20 +210,20 @@ export default function AdminDashboard() {
             <div className="space-y-4">
               <div className="flex justify-between text-xs font-black uppercase tracking-widest">
                 <span className="text-emerald-100/70">Complaint Resolving</span>
-                <span className="text-white">78%</span>
+                <span className="text-white">{complaintPct}%</span>
               </div>
               <div className="w-full bg-black/10 h-3 rounded-full overflow-hidden border border-white/5 p-0.5">
-                <div className="bg-white h-full rounded-full shadow-[0_0_15px_rgba(255,255,255,0.5)]" style={{ width: '78%' }} />
+                <div className="bg-white h-full rounded-full shadow-[0_0_15px_rgba(255,255,255,0.5)] transition-all duration-1000" style={{ width: `${complaintPct}%` }} />
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="flex justify-between text-xs font-black uppercase tracking-widest">
                 <span className="text-emerald-100/70">Scheme Utilization</span>
-                <span className="text-white">62%</span>
+                <span className="text-white">{schemePct}%</span>
               </div>
               <div className="w-full bg-black/10 h-3 rounded-full overflow-hidden border border-white/5 p-0.5">
-                <div className="bg-white/40 h-full rounded-full" style={{ width: '62%' }} />
+                <div className="bg-white/40 h-full rounded-full transition-all duration-1000" style={{ width: `${schemePct}%` }} />
               </div>
             </div>
 
