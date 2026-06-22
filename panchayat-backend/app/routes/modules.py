@@ -869,19 +869,25 @@ async def update_citizen(id: int, data: CitizenUpdate, current_user=Depends(veri
     if update_data:
         await db.user.update(where={"id": id}, data=update_data)
         
-    if user.profile:
-        profile_data = {}
-        if data.gender: profile_data["gender"] = data.gender.lower()
-        if data.ward: profile_data["village"] = data.ward
-        if data.aadhaar_number: profile_data["aadhaar_number"] = data.aadhaar_number
-        if data.address: profile_data["address"] = data.address
-        if data.dob: profile_data["date_of_birth"] = datetime.strptime(data.dob, "%Y-%m-%d")
-        
-        if profile_data:
+    profile_data = {}
+    if data.gender: profile_data["gender"] = data.gender.lower()
+    if data.ward: profile_data["village"] = data.ward
+    if data.aadhaar_number: profile_data["aadhaar_number"] = data.aadhaar_number
+    if data.address: profile_data["address"] = data.address
+    if data.dob: profile_data["date_of_birth"] = datetime.strptime(data.dob, "%Y-%m-%d")
+    
+    if profile_data:
+        if user.profile:
             await db.citizenprofile.update(
                 where={"id": user.profile.id},
                 data=profile_data
             )
+        else:
+            profile_data["user"] = {"connect": {"id": id}}
+            # Ensure unique aadhaar if not provided
+            if "aadhaar_number" not in profile_data:
+                profile_data["aadhaar_number"] = f"PENDING-{uuid.uuid4().hex[:8]}"
+            await db.citizenprofile.create(data=profile_data)
             
     return {"message": "Citizen updated successfully"}
 
