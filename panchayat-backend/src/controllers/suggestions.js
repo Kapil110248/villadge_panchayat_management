@@ -2,10 +2,24 @@ const { prisma } = require('../db');
 
 exports.getSuggestions = async (req, res) => {
   try {
-    let suggs = await prisma.userSuggestion.findMany({ include: { citizen: true, votes: true }, orderBy: { submitted_at: 'desc' } });
+    let suggs = await prisma.userSuggestion.findMany({ 
+      include: { 
+        citizen: true, 
+        processed_by: true,
+        votes: { include: { citizen: true } } 
+      }, 
+      orderBy: { submitted_at: 'desc' } 
+    });
     if (suggs.length === 0) {
       await prisma.userSuggestion.create({ data: { citizen_id: req.user.id, title: "Establish a Public Library", description: "We need a village study room with local books and newspaper support.", status: "under_consideration" } });
-      suggs = await prisma.userSuggestion.findMany({ include: { citizen: true, votes: true }, orderBy: { submitted_at: 'desc' } });
+      suggs = await prisma.userSuggestion.findMany({ 
+        include: { 
+          citizen: true, 
+          processed_by: true,
+          votes: { include: { citizen: true } } 
+        }, 
+        orderBy: { submitted_at: 'desc' } 
+      });
     }
     res.json(suggs);
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
@@ -33,7 +47,10 @@ exports.updateSuggestionStatus = async (req, res) => {
     const data = req.body;
     const valid_statuses = ["pending", "under_consideration", "accepted", "rejected"];
     if (!valid_statuses.includes(data.status)) return res.status(400).json({ detail: "Invalid status" });
-    const sugg = await prisma.userSuggestion.update({ where: { id: parseInt(req.params.id) }, data: { status: data.status } });
+    const sugg = await prisma.userSuggestion.update({ 
+      where: { id: parseInt(req.params.id) }, 
+      data: { status: data.status, processed_by_id: req.user.id } 
+    });
     res.json({ message: `Suggestion marked as ${data.status}`, suggestion: sugg });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };

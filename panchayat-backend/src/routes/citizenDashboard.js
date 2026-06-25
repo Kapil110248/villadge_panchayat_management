@@ -24,4 +24,7 @@ router.put('/citizen/profile', controller.updateProfile);
 router.post('/citizen/family/members', controller.addFamilyMember);
 router.put('/citizen/family/members/:id', controller.updateFamilyMember);
 
+router.get('/citizen/vault-documents/:userId', controller.getVaultDocuments);
+router.post('/citizen/vault-documents', controller.saveVaultDocuments);
+
 module.exports = router;

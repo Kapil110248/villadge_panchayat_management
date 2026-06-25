@@ -84,6 +84,7 @@ model User {
   family_member_id   Int?
   family             Family?              @relation("FamilyMembers", fields: [family_member_id], references: [id])
   suggestions        UserSuggestion[]
+  processed_suggestions UserSuggestion[] @relation("ProcessedSuggestions")
   votes              SuggestionVote[]
   ration_receipts    RationReceipt[]
   camp_registrations CampRegistration[]
@@ -104,6 +105,7 @@ model RegistrationRequest {
   village         String        @default("Sarahi")
   pincode         String
   password_hash   String
+  father_name     String?
   status          RequestStatus @default(pending)
   
   submitted_at    DateTime      @default(now())
@@ -125,6 +127,9 @@ model CitizenProfile {
   village        String?
   pincode        String?
   avatar_url     String?
+  father_name    String?
+  ration_card_type   String?   @default("APL")
+  ration_card_number String?
 
   user           User      @relation(fields: [user_id], references: [id])
 }
@@ -230,10 +235,12 @@ model GramSabhaMeeting {
   date_time       DateTime
   agenda          String             @db.Text
   location        String
-  status          String             @default("scheduled") // scheduled, completed, cancelled
+  status          String             @default("scheduled") // scheduled, ongoing, completed, cancelled
   notice_published Boolean           @default(false)
   minutes_url     String?            // PDF path for meeting minutes
   resolutions     String?            @db.Text
+  started_at      DateTime?
+  completed_at    DateTime?
   created_at      DateTime           @default(now())
   
   suggestions     SabhaSuggestion[]
@@ -320,6 +327,7 @@ model TaxRecord {
   payment_date    DateTime?
   transaction_id  String?
   created_at      DateTime           @default(now())
+  penalty_rate    Float              @default(0.0)
   
   citizen         User               @relation(fields: [citizen_id], references: [id])
 }
@@ -405,6 +413,8 @@ model UserSuggestion {
   description     String             @db.Text
   status          String             @default("pending") // pending, consideration, approved, rejected, implemented
   submitted_at    DateTime           @default(now())
+  processed_by_id Int?
+  processed_by    User?              @relation("ProcessedSuggestions", fields: [processed_by_id], references: [id])
   
   citizen         User               @relation(fields: [citizen_id], references: [id])
   votes           SuggestionVote[]

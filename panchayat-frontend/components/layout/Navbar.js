@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Search, User, Menu, Command, LogOut, FileText, Users, Shield, BarChart, Settings, MessageSquare, Landmark, Hammer, X, CheckCircle2 } from "lucide-react";
+import { Bell, Search, User, Menu, Command, LogOut, FileText, Users, Shield, BarChart, Settings, MessageSquare, Landmark, Hammer, X, CheckCircle2, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -28,12 +28,16 @@ const searchItems = [
 export function Navbar({ role, onMenuClick }) {
   const [userName, setUserName] = useState("Ramesh Kumar");
   const [userAvatar, setUserAvatar] = useState(null);
+  const [villageName, setVillageName] = useState("Sarahi");
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
-  
+  const [activeToast, setActiveToast] = useState(null);
+
+  const displayedNotifIds = useRef(new Set());
+  const isFirstLoad = useRef(true);
   const searchRef = useRef(null);
   const notifRef = useRef(null);
   const router = useRouter();
@@ -45,13 +49,34 @@ export function Navbar({ role, onMenuClick }) {
       const endpoint = role === "citizen" ? "/citizen/notifications" : "/notifications";
       const res = await api.get(endpoint, token);
       
-      // The citizen endpoint returns an array, the admin returns { notifications, unread_count }
+      let fetchedNotifs = [];
+      let unread = 0;
       if (role === "citizen") {
-        setNotifications(res);
-        setUnreadCount(res.filter(n => !n.is_read).length);
+        fetchedNotifs = res || [];
+        unread = fetchedNotifs.filter(n => !n.is_read).length;
       } else {
-        setNotifications(res.notifications || []);
-        setUnreadCount(res.unread_count || 0);
+        fetchedNotifs = res.notifications || [];
+        unread = res.unread_count || 0;
+      }
+
+      setNotifications(fetchedNotifs);
+      setUnreadCount(unread);
+
+      // Handle real-time Toast alerts for new incoming unread notifications
+      if (fetchedNotifs.length > 0) {
+        if (isFirstLoad.current) {
+          fetchedNotifs.forEach(n => displayedNotifIds.current.add(n.id));
+          isFirstLoad.current = false;
+        } else {
+          const newUnread = fetchedNotifs.find(n => !n.is_read && !displayedNotifIds.current.has(n.id));
+          if (newUnread) {
+            displayedNotifIds.current.add(newUnread.id);
+            setActiveToast(newUnread);
+            setTimeout(() => {
+              setActiveToast(curr => curr?.id === newUnread.id ? null : curr);
+            }, 8000);
+          }
+        }
       }
     } catch (e) { console.error("Failed to fetch notifications"); }
   };
@@ -64,7 +89,11 @@ export function Navbar({ role, onMenuClick }) {
       fetchNotifications();
       if (url) {
         setShowNotifications(false);
-        router.push(url);
+        let targetUrl = url;
+        if (role === "clerk" && url.startsWith("/admin/")) {
+          targetUrl = url.replace("/admin/", "/clerk/");
+        }
+        router.push(targetUrl);
       }
     } catch (e) {}
   };
@@ -79,11 +108,57 @@ export function Navbar({ role, onMenuClick }) {
   };
 
   useEffect(() => {
-    const handleAvatarUpdate = () => {
+    const handleAvatarUpdate = async () => {
       const storedName = localStorage.getItem("userName");
       if (storedName) setUserName(storedName);
       const storedAvatar = localStorage.getItem("userAvatar");
       if (storedAvatar) setUserAvatar(storedAvatar);
+
+      try {
+        const token = localStorage.getItem("accessToken");
+        if (token) {
+          if (role === "admin") {
+            const data = await api.get("/admin/profile", token);
+            if (data) {
+              if (data.name) {
+                setUserName(data.name);
+                localStorage.setItem("userName", data.name);
+              }
+              if (data.avatar_url !== undefined) {
+                setUserAvatar(data.avatar_url);
+                localStorage.setItem("userAvatar", data.avatar_url || "");
+              }
+              if (data.village) {
+                setVillageName(data.village);
+              }
+            }
+          } else {
+            // Fetch public panchayat info
+            try {
+              const pInfo = await api.get("/panchayat/info");
+              if (pInfo && pInfo.village) {
+                setVillageName(pInfo.village);
+              }
+            } catch (e) {}
+
+            if (role === "citizen") {
+              const data = await api.get("/citizen/profile", token);
+              if (data && data.user) {
+                if (data.user.full_name) {
+                  setUserName(data.user.full_name);
+                  localStorage.setItem("userName", data.user.full_name);
+                }
+                if (data.user.avatar_url !== undefined) {
+                  setUserAvatar(data.user.avatar_url);
+                  localStorage.setItem("userAvatar", data.user.avatar_url || "");
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error loading navbar details:", err);
+      }
     };
     
     handleAvatarUpdate();
@@ -92,8 +167,8 @@ export function Navbar({ role, onMenuClick }) {
     // Fetch immediately
     fetchNotifications();
     
-    // Poll every 30 seconds
-    const interval = setInterval(fetchNotifications, 30000);
+    // Poll every 5 seconds for instant notification arrival
+    const interval = setInterval(fetchNotifications, 5000);
     return () => {
       window.removeEventListener("avatarUpdated", handleAvatarUpdate);
       clearInterval(interval);
@@ -283,7 +358,9 @@ export function Navbar({ role, onMenuClick }) {
         <div className="flex items-center gap-3 pl-5 border-l border-slate-200">
           <div className="text-right hidden xl:block">
             <p className="text-sm font-black text-slate-900 leading-none">{userName}</p>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Sarahi Village</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+              {villageName.toLowerCase().includes("panchayat") || villageName.toLowerCase().includes("panchyat") ? villageName : `${villageName} Village`}
+            </p>
           </div>
           <Link href={`/${role}/profile`} className="relative group cursor-pointer block">
              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl flex items-center justify-center border border-primary/20 p-1 group-hover:scale-105 transition-transform">
@@ -306,6 +383,38 @@ export function Navbar({ role, onMenuClick }) {
           </Link>
         </div>
       </div>
+
+      {/* Real-time Notification Toast */}
+      {activeToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-white/95 backdrop-blur border border-primary/20 rounded-2xl shadow-2xl p-4 flex gap-3 animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center shrink-0 shadow-lg shadow-primary/20">
+            <Bell className="w-5 h-5 animate-bounce" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-start justify-between">
+              <h4 className="text-sm font-black text-slate-900 line-clamp-1">{activeToast.title}</h4>
+              <button 
+                onClick={() => setActiveToast(null)} 
+                className="text-slate-400 hover:text-slate-600 p-0.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-600 font-medium mt-1 leading-relaxed line-clamp-2">{activeToast.message}</p>
+            {activeToast.action_url && (
+              <button 
+                onClick={() => {
+                  markAsRead(activeToast.id, activeToast.action_url);
+                  setActiveToast(null);
+                }} 
+                className="mt-2 text-xs font-bold text-primary hover:underline flex items-center gap-1"
+              >
+                View Details <ArrowUpRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 }

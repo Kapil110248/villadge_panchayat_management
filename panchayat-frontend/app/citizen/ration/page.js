@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 
 export default function CitizenRation() {
   const [schedules, setSchedules] = useState([]);
+  const [quota, setQuota] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,7 +15,8 @@ export default function CitizenRation() {
       try {
         const token = localStorage.getItem("accessToken");
         const data = await api.get("/ration", token);
-        setSchedules(data);
+        setSchedules(data.schedules || []);
+        setQuota(data.quota || null);
       } catch (error) {
         console.error("Failed to load ration schedule:", error);
       } finally {
@@ -39,25 +41,48 @@ export default function CitizenRation() {
             <CardContent className="space-y-4">
               {loading ? (
                 <p className="text-center py-6 text-slate-400">Loading schedules...</p>
+              ) : schedules.length === 0 ? (
+                <p className="text-center py-6 text-slate-400">No schedules announced yet.</p>
               ) : (
                 schedules.map((sched) => (
                   <div key={sched.id} className="p-6 bg-slate-50 border border-slate-100 rounded-3xl space-y-4">
                     <div className="flex flex-wrap justify-between items-center gap-4">
                       <div className="flex items-center gap-2 text-sm text-slate-500 font-bold">
                         <Calendar className="w-4 h-4 text-primary" />
-                        Date: {new Date(sched.distribution_date).toLocaleDateString("en-IN")}
+                        Date: {new Date(sched.distribution_date).toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-slate-500 font-bold">
                         <Clock className="w-4 h-4 text-primary" />
                         Timing: {sched.timing_description}
                       </div>
                     </div>
-                    <div className="border-t border-slate-100 pt-4">
-                      <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest block mb-2">Available Quota Materials</span>
-                      <p className="text-sm font-black text-slate-900 bg-white p-4 rounded-2xl border border-slate-100/50">
-                        {sched.items_available}
-                      </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-100 pt-4">
+                      <div className="p-4 bg-white rounded-2xl border border-slate-100/50">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ration Shop (Kotedar)</p>
+                        <p className="text-sm font-bold text-slate-700">{sched.shop_name || "Any Designated Shop"}</p>
+                      </div>
+                      <div className="p-4 bg-white rounded-2xl border border-slate-100/50">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Card Eligibility</p>
+                        <p className="text-sm font-bold text-slate-700">{sched.card_type || "All Cards"}</p>
+                      </div>
+                      <div className="p-4 bg-white rounded-2xl border border-slate-100/50">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ward / Area</p>
+                        <p className="text-sm font-bold text-slate-700">{sched.ward_area || "Whole Village"}</p>
+                      </div>
                     </div>
+
+                    <div className="p-4 bg-white rounded-2xl border border-slate-100/50">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Items Available</p>
+                      <p className="text-sm font-semibold text-slate-700">{sched.items_available}</p>
+                    </div>
+
+                    {sched.special_instructions && (
+                      <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100/50">
+                        <p className="text-[10px] font-black text-amber-600/80 uppercase tracking-widest mb-2">Special Instructions</p>
+                        <p className="text-sm font-semibold text-amber-900">{sched.special_instructions}</p>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -72,20 +97,33 @@ export default function CitizenRation() {
             <CardContent className="space-y-4 text-xs font-semibold text-slate-600">
               <div className="flex justify-between items-center">
                 <span>Wheat (Genu)</span>
-                <span className="font-black text-slate-900">10 kg / Member</span>
+                <span className="font-black text-slate-900">
+                  {quota ? `${quota.wheat} kg` : "10 kg"} 
+                  {quota && <span className="text-[10px] text-slate-400 font-medium ml-1">(for {quota.family_size} member{quota.family_size > 1 ? 's' : ''})</span>}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Rice (Chawal)</span>
-                <span className="font-black text-slate-900">5 kg / Member</span>
+                <span className="font-black text-slate-900">
+                  {quota ? `${quota.rice} kg` : "5 kg"}
+                  {quota && <span className="text-[10px] text-slate-400 font-medium ml-1">(for {quota.family_size} member{quota.family_size > 1 ? 's' : ''})</span>}
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span>Sugar (Cheeni)</span>
-                <span className="font-black text-slate-900">1 kg / Household</span>
+                <span className="font-black text-slate-900">{quota ? `${quota.sugar} kg` : "1 kg"}</span>
               </div>
-              <div className="border-t border-slate-50 pt-4 flex items-center gap-2 text-[10px] text-emerald-600 font-bold uppercase tracking-widest">
-                <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span>Ration Card Grade: A (NFSA)</span>
-              </div>
+              {quota && (
+                <div className="border-t border-slate-50 pt-4 flex flex-col gap-1">
+                  <div className="flex items-center gap-2 text-[10px] text-emerald-600 font-bold uppercase tracking-widest">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span>Ration Card Grade: {quota.card_type} (NFSA)</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-6">
+                    Card No: {quota.card_number}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

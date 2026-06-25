@@ -3,23 +3,49 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { IndianRupee, TrendingUp, AlertTriangle, CheckCircle, PieChart, Download, Plus, Clock, Check, X } from "lucide-react";
+import { IndianRupee, TrendingUp, AlertTriangle, CheckCircle, PieChart, Download, Plus, Clock, Check, X, History } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function AdminTaxes() {
+  const calculateTaxPenalty = (tax) => {
+    const dueDate = new Date(tax.due_date);
+    const endDate = tax.payment_date ? new Date(tax.payment_date) : new Date();
+    
+    if (endDate <= dueDate || (tax.status === "unpaid" && new Date() <= dueDate)) {
+      return { months: 0, penalty: 0, total: tax.amount };
+    }
+    
+    const diffTime = endDate - dueDate;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const months = Math.max(1, Math.ceil(diffDays / 30));
+    
+    const penalty = (tax.amount * (tax.penalty_rate || 0) * months) / 100;
+    return { months, penalty, total: tax.amount + penalty };
+  };
+
   const [taxes, setTaxes] = useState([]);
   const [citizens, setCitizens] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   
   const [showLevyModal, setShowLevyModal] = useState(false);
-  const [levyForm, setLevyForm] = useState({ citizen_id: "", tax_type: "house", amount: "", due_date: "" });
+  const [levyForm, setLevyForm] = useState({ citizen_id: "", tax_type: "house", amount: "", due_date: "", penalty_rate: "" });
   const [customTaxType, setCustomTaxType] = useState("");
   
   const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [generateForm, setGenerateForm] = useState({ house_tax_amount: 500, water_tax_amount: 200, due_date: "" });
+  const [generateForm, setGenerateForm] = useState({ house_tax_amount: 500, water_tax_amount: 200, due_date: "", penalty_rate: "" });
 
   const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState("success");
+  const [selectedCitizenForHistory, setSelectedCitizenForHistory] = useState(null);
+
+  const showToast = (message, type = "success") => {
+    setToastMessage(message);
+    setToastType(type);
+    setTimeout(() => {
+      setToastMessage("");
+    }, 4000);
+  };
 
   useEffect(() => { fetchData(); }, []);
 
@@ -41,10 +67,9 @@ export default function AdminTaxes() {
     try {
       const token = localStorage.getItem("accessToken");
       await api.put(`/taxes/${id}/approve`, {}, token);
-      setToastMessage("Payment Approved!");
-      setTimeout(() => setToastMessage(""), 3000);
+      showToast("Payment Approved!");
       fetchData();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showToast(e.message, "error"); }
   };
 
   const handleLevy = async (e) => {
@@ -53,43 +78,48 @@ export default function AdminTaxes() {
       const token = localStorage.getItem("accessToken");
       const finalTaxType = levyForm.tax_type === "other" ? customTaxType : levyForm.tax_type;
       
-      await api.post("/taxes/levy", { ...levyForm, tax_type: finalTaxType, amount: parseFloat(levyForm.amount), due_date: new Date(levyForm.due_date).toISOString() }, token);
-      setToastMessage("Tax Levied Successfully!");
-      setTimeout(() => setToastMessage(""), 3000);
+      await api.post("/taxes/levy", { ...levyForm, tax_type: finalTaxType, amount: parseFloat(levyForm.amount), due_date: new Date(levyForm.due_date).toISOString(), penalty_rate: levyForm.penalty_rate ? parseFloat(levyForm.penalty_rate) : 0.0 }, token);
+      showToast("Tax Levied Successfully!");
       setShowLevyModal(false);
-      setLevyForm({ citizen_id: "", tax_type: "house", amount: "", due_date: "" });
+      setLevyForm({ citizen_id: "", tax_type: "house", amount: "", due_date: "", penalty_rate: "" });
       setCustomTaxType("");
       fetchData();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showToast(e.message, "error"); }
   };
 
   const handleGenerate = async (e) => {
     e.preventDefault();
     try {
       const token = localStorage.getItem("accessToken");
-      const res = await api.post("/taxes/generate", { ...generateForm, house_tax_amount: parseFloat(generateForm.house_tax_amount), water_tax_amount: parseFloat(generateForm.water_tax_amount), due_date: new Date(generateForm.due_date).toISOString() }, token);
-      setToastMessage(res.message || "Taxes Generated Successfully!");
-      setTimeout(() => setToastMessage(""), 3000);
+      const res = await api.post("/taxes/generate", { ...generateForm, house_tax_amount: parseFloat(generateForm.house_tax_amount), water_tax_amount: parseFloat(generateForm.water_tax_amount), due_date: new Date(generateForm.due_date).toISOString(), penalty_rate: generateForm.penalty_rate ? parseFloat(generateForm.penalty_rate) : 0.0 }, token);
+      showToast(res.message || "Taxes Generated Successfully!");
       setShowGenerateModal(false);
+      setGenerateForm({ house_tax_amount: 500, water_tax_amount: 200, due_date: "", penalty_rate: "" });
       setCustomTaxType("");
       fetchData();
-    } catch (e) { alert(e.message); }
+    } catch (e) { showToast(e.message, "error"); }
   };
 
   const handleExport = () => {
     try {
       const printWindow = window.open('', '_blank', 'width=800,height=600');
       
-      const rows = taxes.map(t => `
-        <tr>
-          <td>${t.citizen?.full_name || "—"}</td>
-          <td style="text-transform: capitalize;">${t.tax_type}</td>
-          <td style="font-weight: bold;">₹${(t.amount || 0).toLocaleString("en-IN")}</td>
-          <td>${t.due_date ? new Date(t.due_date).toLocaleDateString("en-IN") : "—"}</td>
-          <td style="text-transform: uppercase; font-weight: bold; color: ${t.status === 'paid' ? '#10b981' : t.status === 'pending' ? '#f59e0b' : '#ef4444'};">${t.status}</td>
-          <td style="font-family: monospace; color: #64748b;">${t.transaction_id || "—"}</td>
-        </tr>
-      `).join("");
+      const rows = taxes.map(t => {
+        const { months, penalty, total } = calculateTaxPenalty(t);
+        const citizenFullName = t.citizen?.full_name || "—";
+        const fatherSuffix = t.citizen?.profile?.father_name ? ` (S/O: ${t.citizen.profile.father_name})` : "";
+        const penaltyText = penalty > 0 ? ` + ₹${penalty.toLocaleString("en-IN")} (${t.penalty_rate}% Interest × ${months} Mo)` : "";
+        return `
+          <tr>
+            <td>${citizenFullName}${fatherSuffix}</td>
+            <td style="text-transform: capitalize;">${t.tax_type}</td>
+            <td style="font-weight: bold;">₹${total.toLocaleString("en-IN")}${penaltyText}</td>
+            <td>${t.due_date ? new Date(t.due_date).toLocaleDateString("en-IN") : "—"}</td>
+            <td style="text-transform: uppercase; font-weight: bold; color: ${t.status === 'paid' ? '#10b981' : t.status === 'pending' ? '#f59e0b' : '#ef4444'};">${t.status}</td>
+            <td style="font-family: monospace; color: #64748b;">${t.transaction_id || "—"}</td>
+          </tr>
+        `;
+      }).join("");
 
       printWindow.document.write(`
         <html>
@@ -245,31 +275,64 @@ export default function AdminTaxes() {
                 </tr>
               </thead>
               <tbody>
-                {taxes.map(t => (
-                  <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-bold text-slate-900">{t.citizen?.full_name || "—"}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${t.tax_type === "house" ? "bg-amber-500/10 text-amber-700" : "bg-cyan-500/10 text-cyan-700"}`}>
-                        {t.tax_type}
-                      </span>
+                {taxes.map(t => {
+                  const { months, penalty, total } = calculateTaxPenalty(t);
+                  return (
+                    <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          {t.citizen?.full_name || "—"}
+                          {t.citizen?.profile?.father_name && (
+                            <span className="block text-xs font-semibold text-slate-400">
+                              S/O: {t.citizen.profile.father_name}
+                            </span>
+                          )}
+                        </div>
+                        {t.citizen && (
+                          <button
+                            onClick={() => setSelectedCitizenForHistory(t.citizen)}
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition-all hover:text-emerald-600 shrink-0"
+                            title="View Tax History"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-slate-900">₹{(t.amount || 0).toLocaleString("en-IN")}</td>
-                    <td className="px-6 py-4 text-xs font-semibold text-slate-500">{t.due_date ? new Date(t.due_date).toLocaleDateString("en-IN") : "—"}</td>
-                    <td className="px-6 py-4">
-                      {t.status === "paid" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-700 inline-flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Paid</span>}
-                      {t.status === "unpaid" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-rose-500/10 text-rose-700 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Unpaid</span>}
-                      {t.status === "pending" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-700 inline-flex items-center gap-1"><Clock className="w-3 h-3"/> Verifying</span>}
-                    </td>
-                    <td className="px-6 py-4 text-xs font-mono text-slate-500">{t.transaction_id || "—"}</td>
-                    <td className="px-6 py-4 text-right">
-                      {t.status === "pending" && (
-                        <Button onClick={() => handleApprove(t.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1 text-xs px-3">
-                          <Check className="w-3 h-3" /> Approve
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${t.tax_type === "house" ? "bg-amber-500/10 text-amber-700" : "bg-cyan-500/10 text-cyan-700"}`}>
+                          {t.tax_type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                        {penalty > 0 ? (
+                          <div>
+                            <span className="text-xs text-slate-400 line-through mr-1">₹{t.amount.toLocaleString("en-IN")}</span>
+                            <span className="text-xs text-rose-500 font-bold block">+₹{penalty.toLocaleString("en-IN")} ({t.penalty_rate}% × {months} {months === 1 ? 'Month' : 'Months'})</span>
+                            <span className="text-sm font-black text-rose-600 block">₹{total.toLocaleString("en-IN")}</span>
+                          </div>
+                        ) : (
+                          <span>₹{(t.amount || 0).toLocaleString("en-IN")}</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-xs font-semibold text-slate-500">{t.due_date ? new Date(t.due_date).toLocaleDateString("en-IN") : "—"}</td>
+                      <td className="px-6 py-4">
+                        {t.status === "paid" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-700 inline-flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Paid</span>}
+                        {t.status === "unpaid" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-rose-500/10 text-rose-700 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Unpaid</span>}
+                        {t.status === "pending" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-700 inline-flex items-center gap-1"><Clock className="w-3 h-3"/> Verifying</span>}
+                      </td>
+                      <td className="px-6 py-4 text-xs font-mono text-slate-500">{t.transaction_id || "—"}</td>
+                      <td className="px-6 py-4 text-right">
+                        {t.status === "pending" && (
+                          <Button onClick={() => handleApprove(t.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1 text-xs px-3">
+                            <Check className="w-3 h-3" /> Approve
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -294,7 +357,11 @@ export default function AdminTaxes() {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Select Citizen</label>
                     <select required value={levyForm.citizen_id} onChange={e => setLevyForm({...levyForm, citizen_id: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none">
                       <option value="">-- Choose Citizen --</option>
-                      {citizens.map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+                      {citizens.filter(c => c.family_head !== null || (!c.family_member_id && !c.family)).map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.full_name} {c.profile?.father_name ? `(S/O: ${c.profile.father_name})` : ""}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -314,6 +381,13 @@ export default function AdminTaxes() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount (₹)</label>
                     <input type="number" required value={levyForm.amount} onChange={e => setLevyForm({...levyForm, amount: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Penalty Rate / Interest Rate</label>
+                    <div className="flex rounded-xl overflow-hidden border border-slate-200 focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:border-emerald-500 bg-slate-50">
+                      <input type="number" step="0.1" value={levyForm.penalty_rate} onChange={e => setLevyForm({...levyForm, penalty_rate: e.target.value})} placeholder="e.g. 5" className="flex-1 bg-transparent p-3 text-sm font-semibold outline-none border-none" />
+                      <div className="px-4 flex items-center bg-slate-100 border-l border-slate-200 text-slate-500 text-sm font-black">%</div>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Due Date</label>
@@ -352,6 +426,13 @@ export default function AdminTaxes() {
                     <input type="number" required value={generateForm.water_tax_amount} onChange={e => setGenerateForm({...generateForm, water_tax_amount: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold focus:ring-4 focus:ring-cyan-500/10 focus:border-cyan-500 outline-none" />
                   </div>
                   <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Penalty Rate / Interest Rate</label>
+                    <div className="flex rounded-xl overflow-hidden border border-slate-200 focus-within:ring-4 focus-within:ring-cyan-500/10 focus-within:border-cyan-500 bg-slate-50">
+                      <input type="number" step="0.1" value={generateForm.penalty_rate} onChange={e => setGenerateForm({...generateForm, penalty_rate: e.target.value})} placeholder="e.g. 5" className="flex-1 bg-transparent p-3 text-sm font-semibold outline-none border-none" />
+                      <div className="px-4 flex items-center bg-slate-100 border-l border-slate-200 text-slate-500 text-sm font-black">%</div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Due Date</label>
                     <input type="date" required value={generateForm.due_date} onChange={e => setGenerateForm({...generateForm, due_date: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold focus:ring-4 focus:ring-cyan-500/10 focus:border-cyan-500 outline-none" />
                   </div>
@@ -365,11 +446,137 @@ export default function AdminTaxes() {
         </div>
       )}
 
+      {/* Citizen Tax History Modal */}
+      {selectedCitizenForHistory && (() => {
+        const citizenTaxes = taxes.filter(t => t.citizen_id === selectedCitizenForHistory.id);
+        const paidTaxes = citizenTaxes.filter(t => t.status === "paid");
+        const unpaidTaxes = citizenTaxes.filter(t => t.status === "unpaid" || t.status === "pending");
+        
+        const totalPaidSum = paidTaxes.reduce((sum, t) => sum + calculateTaxPenalty(t).total, 0);
+        const totalUnpaidSum = unpaidTaxes.reduce((sum, t) => sum + calculateTaxPenalty(t).total, 0);
+        
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+            <Card className="w-full max-w-4xl relative shadow-2xl border-0 animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
+              <button onClick={() => setSelectedCitizenForHistory(null)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all z-10">
+                <X className="w-4 h-4" />
+              </button>
+              
+              <CardContent className="p-8 overflow-y-auto space-y-6">
+                {/* Header */}
+                <div className="flex items-center gap-4 mb-2">
+                  <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
+                    <History className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900">{selectedCitizenForHistory.full_name}'s Tax Ledger</h3>
+                    <p className="text-xs font-semibold text-slate-400">
+                      {selectedCitizenForHistory.profile?.father_name ? `S/O: ${selectedCitizenForHistory.profile.father_name} • ` : ""}
+                      Email: {selectedCitizenForHistory.email}
+                    </p>
+                  </div>
+                </div>
+
+                {/* mini analytics */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Paid</p>
+                      <h4 className="text-xl font-black text-emerald-700">₹{totalPaidSum.toLocaleString("en-IN")}</h4>
+                    </div>
+                    <span className="bg-emerald-500/10 text-emerald-700 px-3 py-1 rounded-full text-xs font-black">{paidTaxes.length} Bills</span>
+                  </div>
+                  
+                  <div className="p-4 bg-rose-50 rounded-2xl border border-rose-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Total Outstanding</p>
+                      <h4 className="text-xl font-black text-rose-700">₹{totalUnpaidSum.toLocaleString("en-IN")}</h4>
+                    </div>
+                    <span className="bg-rose-500/10 text-rose-700 px-3 py-1 rounded-full text-xs font-black">{unpaidTaxes.length} Bills</span>
+                  </div>
+                </div>
+
+                {/* Ledger Table */}
+                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-left">
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Type</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Due</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Due Date</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
+                          <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Payment Info</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {citizenTaxes.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic text-sm">No tax bills found for this citizen.</td>
+                          </tr>
+                        ) : (
+                          citizenTaxes.map(ct => {
+                            const { months, penalty, total } = calculateTaxPenalty(ct);
+                            return (
+                              <tr key={ct.id} className="border-b border-slate-50 hover:bg-slate-50/50 text-sm">
+                                <td className="px-4 py-3 font-bold text-slate-900 capitalize">{ct.tax_type}</td>
+                                <td className="px-4 py-3 font-bold text-slate-900">
+                                  {penalty > 0 ? (
+                                    <div>
+                                      <span className="text-[10px] text-slate-400 line-through mr-1">₹{ct.amount}</span>
+                                      <span className="text-[10px] text-rose-500 font-bold block">+₹{penalty.toFixed(2)} ({ct.penalty_rate}% × {months} mo)</span>
+                                      <span className="text-sm font-black text-rose-600 block">₹{total.toFixed(2)}</span>
+                                    </div>
+                                  ) : (
+                                    <span>₹{ct.amount}</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-xs text-slate-500">{ct.due_date ? new Date(ct.due_date).toLocaleDateString("en-IN") : "—"}</td>
+                                <td className="px-4 py-3">
+                                  {ct.status === "paid" && <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-700 inline-flex items-center gap-0.5"><CheckCircle className="w-2.5 h-2.5"/> Paid</span>}
+                                  {ct.status === "unpaid" && <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-rose-500/10 text-rose-700 inline-flex items-center gap-0.5"><AlertTriangle className="w-2.5 h-2.5"/> Unpaid</span>}
+                                  {ct.status === "pending" && <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-amber-500/10 text-amber-700 inline-flex items-center gap-0.5"><Clock className="w-2.5 h-2.5"/> Verifying</span>}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-slate-500">
+                                  {ct.status === "paid" && ct.payment_date && (
+                                    <div>
+                                      <span className="block text-[10px] font-semibold text-slate-400">Paid on {new Date(ct.payment_date).toLocaleDateString("en-IN")}</span>
+                                      <span className="block text-[10px] text-slate-500">TxID: {ct.transaction_id || "—"}</span>
+                                    </div>
+                                  )}
+                                  {ct.status === "pending" && (
+                                    <div>
+                                      <span className="block text-[10px] text-slate-500">TxID: {ct.transaction_id || "—"}</span>
+                                      <span className="block text-[9px] text-amber-500 font-bold uppercase">Awaiting Approval</span>
+                                    </div>
+                                  )}
+                                  {ct.status === "unpaid" && <span className="text-slate-400">—</span>}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
       {/* Modern Toast */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-medium">
-            <CheckCircle className="w-5 h-5 text-emerald-400" />
+          <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-medium text-white ${
+            toastType === "error" ? "bg-rose-600 shadow-rose-600/20" : "bg-slate-900 shadow-slate-900/20"
+          }`}>
+            {toastType === "error" ? (
+              <AlertTriangle className="w-5 h-5 text-rose-200" />
+            ) : (
+              <CheckCircle className="w-5 h-5 text-emerald-400" />
+            )}
             {toastMessage}
           </div>
         </div>

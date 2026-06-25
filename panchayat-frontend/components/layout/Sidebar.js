@@ -37,7 +37,6 @@ const getLinks = (role) => {
     { name: "Development Works", href: "/citizen/development", icon: LayoutDashboard },
     { name: "Water Supply", href: "/citizen/water-supply", icon: ClipboardCheck },
     { name: "Tax Center", href: "/citizen/taxes", icon: FileText },
-    { name: "Village Directory", href: "/citizen/directory", icon: Users },
     { name: "Suggestions Box", href: "/citizen/suggestions", icon: Sparkles },
     { name: "Ration Schedule", href: "/citizen/ration", icon: BookOpen },
     { name: "Health Camps", href: "/citizen/health-camps", icon: ClipboardCheck },

@@ -40,7 +40,7 @@ export default function ClerkWaterSupply() {
     try {
       const token = localStorage.getItem("accessToken");
       
-      const bundledNotes = `[OPERATOR: ${form.operator || 'N/A'}] [SOURCE: ${form.source || 'N/A'}] ${form.notes}`;
+      const bundledNotes = `[OPERATOR:${form.operator || 'N/A'}] [SOURCE:${form.source || 'N/A'}] ${form.notes}`;
       
       await api.post("/water-supply", { ...form, notes: bundledNotes }, token);
       
@@ -57,13 +57,13 @@ export default function ClerkWaterSupply() {
     let source = "Unknown";
     let text = rawNotes || "";
 
-    const opMatch = text.match(/\[OPERATOR:(.*?)\]/);
-    const srcMatch = text.match(/\[SOURCE:(.*?)\]/);
+    const opMatch = text.match(/\[OPERATOR:\s*(.*?)\]/i);
+    const srcMatch = text.match(/\[SOURCE:\s*(.*?)\]/i);
 
     if (opMatch) { operator = opMatch[1]; text = text.replace(opMatch[0], ''); }
     if (srcMatch) { source = srcMatch[1]; text = text.replace(srcMatch[0], ''); }
 
-    return { operator, source, text: text.trim() };
+    return { operator: operator.trim(), source: source.trim(), text: text.trim() };
   };
 
   const openUpdateModal = (schedule) => {
@@ -76,7 +76,7 @@ export default function ClerkWaterSupply() {
     e.preventDefault();
     try {
       const token = localStorage.getItem("accessToken");
-      const bundledNotes = `[OPERATOR: ${updateForm.operator || 'N/A'}] [SOURCE: ${updateForm.source || 'N/A'}] ${updateForm.notes}`;
+      const bundledNotes = `[OPERATOR:${updateForm.operator || 'N/A'}] [SOURCE:${updateForm.source || 'N/A'}] ${updateForm.notes}`;
       
       await api.put(`/water-supply/${updateForm.id}`, { ...updateForm, notes: bundledNotes }, token);
       

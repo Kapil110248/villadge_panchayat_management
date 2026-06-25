@@ -1,5 +1,7 @@
 const { prisma } = require('../db');
 const { getPasswordHash } = require('../utils/security');
+const fs = require('fs');
+const path = require('path');
 
 exports.getDashboard = async (req, res) => {
   try {
@@ -68,7 +70,8 @@ exports.approveRegistrationRequest = async (req, res) => {
     await prisma.citizenProfile.create({
       data: {
         user_id: newUser.id, aadhaar_number: request.aadhaar_number, date_of_birth: request.date_of_birth,
-        gender: request.gender, address: request.address, village: request.village, pincode: request.pincode
+        gender: request.gender, address: request.address, village: request.village, pincode: request.pincode,
+        father_name: request.father_name
       }
     });
     
@@ -402,7 +405,20 @@ exports.getReportStats = async (req, res) => {
 
 exports.getGramSabha = async (req, res) => {
   try {
-    const meetings = await prisma.gramSabhaMeeting.findMany({ include: { suggestions: { include: { citizen: true } } }, orderBy: { date_time: 'desc' } });
+    const meetings = await prisma.gramSabhaMeeting.findMany({ 
+      include: { 
+        suggestions: { 
+          include: { 
+            citizen: true,
+            replies: { 
+              include: { citizen: true }, 
+              orderBy: { created_at: 'asc' } 
+            } 
+          } 
+        } 
+      }, 
+      orderBy: { date_time: 'desc' } 
+    });
     res.json(meetings);
   } catch (error) {
     res.status(500).json({ detail: "Internal Server Error" });
@@ -425,10 +441,19 @@ exports.createGramSabha = async (req, res) => {
 exports.updateGramSabhaMinutes = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const minutes_url = req.body.minutes_url || "";
+    const minutes_url = req.body.minutes_url || req.query.minutes_url || "";
+    const resolutions = req.body.resolutions || req.query.resolutions || "";
     const meeting = await prisma.gramSabhaMeeting.findUnique({ where: { id } });
     if (!meeting) return res.status(404).json({ detail: "Meeting not found" });
-    const updated = await prisma.gramSabhaMeeting.update({ where: { id }, data: { status: "completed", minutes_url } });
+    const updated = await prisma.gramSabhaMeeting.update({ 
+      where: { id }, 
+      data: { 
+        status: "completed", 
+        minutes_url,
+        resolutions,
+        completed_at: new Date()
+      } 
+    });
     res.json(updated);
   } catch (error) {
     res.status(500).json({ detail: "Internal Server Error" });
@@ -566,6 +591,170 @@ exports.progressSchemeApplication = async (req, res) => {
     });
 
     res.json({ message: "Application status updated to In Progress.", application: app });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+exports.broadcastMeetingStart = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const meeting = await prisma.gramSabhaMeeting.findUnique({ where: { id } });
+    if (!meeting) return res.status(404).json({ detail: "Meeting not found" });
+
+    // Update status to ongoing and set started_at
+    const updated = await prisma.gramSabhaMeeting.update({
+      where: { id },
+      data: {
+        status: "ongoing",
+        started_at: new Date()
+      }
+    });
+
+    // Notify all citizens
+    const citizens = await prisma.user.findMany({ where: { role: "citizen" } });
+    const notificationsData = citizens.map(c => ({
+      citizen_id: c.id,
+      title: "Gram Sabha Starting Now",
+      message: `The Gram Sabha meeting is starting now at ${meeting.location}. Please join.`,
+      type: "meeting_update",
+      action_url: "/citizen/gram-sabha"
+    }));
+
+    await prisma.citizenNotification.createMany({ data: notificationsData });
+
+    res.json({ message: "Start broadcast sent to all citizens.", meeting: updated });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+exports.postponeMeeting = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { new_date_time, reason } = req.body;
+    
+    const meeting = await prisma.gramSabhaMeeting.findUnique({ where: { id } });
+    if (!meeting) return res.status(404).json({ detail: "Meeting not found" });
+
+    const updatedDateTime = new Date(new_date_time);
+    
+    // Update meeting details
+    const updated = await prisma.gramSabhaMeeting.update({
+      where: { id },
+      data: {
+        date_time: updatedDateTime,
+        agenda: meeting.agenda + `\n[POSTPONED: ${reason || 'N/A'}]`
+      }
+    });
+
+    // Notify all citizens
+    const citizens = await prisma.user.findMany({ where: { role: "citizen" } });
+    const notificationsData = citizens.map(c => ({
+      citizen_id: c.id,
+      title: "Gram Sabha Postponed",
+      message: `Gram Sabha meeting has been rescheduled to ${updatedDateTime.toLocaleString("en-IN")}. Reason: ${reason || 'N/A'}`,
+      type: "meeting_update",
+      action_url: "/citizen/gram-sabha"
+    }));
+
+    await prisma.citizenNotification.createMany({ data: notificationsData });
+
+    res.json({ message: "Meeting postponed and citizens notified.", meeting: updated });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+exports.cancelMeeting = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { reason } = req.body;
+
+    const meeting = await prisma.gramSabhaMeeting.findUnique({ where: { id } });
+    if (!meeting) return res.status(404).json({ detail: "Meeting not found" });
+
+    // Update status to cancelled
+    const updated = await prisma.gramSabhaMeeting.update({
+      where: { id },
+      data: {
+        status: "cancelled",
+        agenda: meeting.agenda + `\n[CANCELLED: ${reason || 'N/A'}]`
+      }
+    });
+
+    // Notify all citizens
+    const citizens = await prisma.user.findMany({ where: { role: "citizen" } });
+    const notificationsData = citizens.map(c => ({
+      citizen_id: c.id,
+      title: "Gram Sabha Cancelled",
+      message: `The scheduled Gram Sabha meeting has been cancelled. Reason: ${reason || 'N/A'}`,
+      type: "meeting_update",
+      action_url: "/citizen/gram-sabha"
+    }));
+
+    await prisma.citizenNotification.createMany({ data: notificationsData });
+
+    res.json({ message: "Meeting cancelled and citizens notified.", meeting: updated });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+exports.getAdminProfile = async (req, res) => {
+  try {
+    const configPath = path.join(__dirname, '../../panchayat_config.json');
+    let config = {
+      name: "Ramesh Kumar",
+      role: "Panchayat Administrator (Sarpanch)",
+      village: "Sarahi",
+      tenure: "2023 - 2028",
+      email: "ramesh.sarpanch@gram.in",
+      phone: "+91 88XXX XXXXX",
+      jurisdiction: "Sarahi Block A & B",
+      rating: "4.8/5.0",
+      avatar_url: "",
+      signature_url: ""
+    };
+    if (fs.existsSync(configPath)) {
+      config = { ...config, ...JSON.parse(fs.readFileSync(configPath, 'utf8')) };
+    }
+    res.json(config);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+exports.updateAdminProfile = async (req, res) => {
+  try {
+    const configPath = path.join(__dirname, '../../panchayat_config.json');
+    const data = req.body;
+    
+    let currentConfig = {};
+    if (fs.existsSync(configPath)) {
+      currentConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    }
+    
+    const newConfig = {
+      name: data.name || currentConfig.name || "Ramesh Kumar",
+      role: data.role || currentConfig.role || "Panchayat Administrator (Sarpanch)",
+      village: data.village || currentConfig.village || "Sarahi",
+      tenure: data.tenure || currentConfig.tenure || "2023 - 2028",
+      email: data.email || currentConfig.email || "ramesh.sarpanch@gram.in",
+      phone: data.phone || currentConfig.phone || "+91 88XXX XXXXX",
+      jurisdiction: data.jurisdiction || currentConfig.jurisdiction || "Sarahi Block A & B",
+      rating: data.rating || currentConfig.rating || "4.8/5.0",
+      avatar_url: data.avatar_url !== undefined ? data.avatar_url : currentConfig.avatar_url || "",
+      signature_url: data.signature_url !== undefined ? data.signature_url : currentConfig.signature_url || ""
+    };
+    
+    fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2), 'utf8');
+    res.json({ message: "Admin profile updated successfully", config: newConfig });
   } catch (error) {
     console.error(error);
     res.status(500).json({ detail: "Internal Server Error" });

@@ -57,13 +57,13 @@ export default function AdminWaterSupply() {
     let source = "Unknown";
     let text = rawNotes || "";
 
-    const opMatch = text.match(/\[OPERATOR:(.*?)\]/);
-    const srcMatch = text.match(/\[SOURCE:(.*?)\]/);
+    const opMatch = text.match(/\[OPERATOR:\s*(.*?)\]/i);
+    const srcMatch = text.match(/\[SOURCE:\s*(.*?)\]/i);
 
     if (opMatch) { operator = opMatch[1]; text = text.replace(opMatch[0], ''); }
     if (srcMatch) { source = srcMatch[1]; text = text.replace(srcMatch[0], ''); }
 
-    return { operator, source, text: text.trim() };
+    return { operator: operator.trim(), source: source.trim(), text: text.trim() };
   };
 
   const openUpdateModal = (schedule) => {

@@ -29,11 +29,17 @@ router.get('/reports/stats', adminController.getReportStats);
 router.get('/gram-sabha', adminController.getGramSabha);
 router.post('/gram-sabha', adminController.createGramSabha);
 router.put('/gram-sabha/:id/minutes', adminController.updateGramSabhaMinutes);
+router.post('/gram-sabha/:id/broadcast-start', adminController.broadcastMeetingStart);
+router.put('/gram-sabha/:id/postpone', adminController.postponeMeeting);
+router.put('/gram-sabha/:id/cancel', adminController.cancelMeeting);
 
 router.get('/scheme-applications', adminController.getSchemeApplications);
 router.put('/scheme-applications/:id/approve', adminController.approveSchemeApplication);
 router.put('/scheme-applications/:id/reject', adminController.rejectSchemeApplication);
 router.put('/scheme-applications/:id/ready', adminController.readySchemeApplication);
 router.put('/scheme-applications/:id/progress', adminController.progressSchemeApplication);
+
+router.get('/profile', adminController.getAdminProfile);
+router.put('/profile', adminController.updateAdminProfile);
 
 module.exports = router;

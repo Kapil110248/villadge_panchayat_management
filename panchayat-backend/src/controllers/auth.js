@@ -42,6 +42,7 @@ exports.register = async (req, res) => {
         village: data.village,
         pincode: data.pincode,
         password_hash: hashedPwd,
+        father_name: data.father_name || null,
         status: 'pending'
       }
     });

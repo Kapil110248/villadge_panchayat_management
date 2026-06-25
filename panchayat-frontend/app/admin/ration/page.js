@@ -34,7 +34,7 @@ export default function AdminRation() {
     try {
       const token = localStorage.getItem("accessToken");
       const data = await api.get("/ration", token);
-      setSchedules(data);
+      setSchedules(data.schedules || data);
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 

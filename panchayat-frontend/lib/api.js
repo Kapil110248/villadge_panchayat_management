@@ -66,6 +66,23 @@ export const api = {
     });
     return handleResponse(response);
   },
+
+  // Helper for uploading files (multipart/form-data)
+  upload: async (endpoint, file, token = null) => {
+    const headers = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    return handleResponse(response);
+  },
 };
 
 // Common error handler

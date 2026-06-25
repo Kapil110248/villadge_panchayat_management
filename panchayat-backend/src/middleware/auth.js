@@ -2,7 +2,21 @@ const jwt = require('jsonwebtoken');
 const { SECRET_KEY } = require('../utils/security');
 const { prisma } = require('../db');
 
+const publicPaths = [
+  /^\/api\/upload\/?$/,
+  /^\/api\/certificates\/verify-pub\/[^/]+$/
+];
+
 async function authenticateToken(req, res, next) {
+  const cleanPath = req.originalUrl.replace(/\/+/g, '/').split('?')[0];
+  const isPublic = publicPaths.some(pattern => pattern.test(cleanPath));
+  if (isPublic) {
+    return next();
+  }
+
+  if (req.user) {
+    return next();
+  }
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 

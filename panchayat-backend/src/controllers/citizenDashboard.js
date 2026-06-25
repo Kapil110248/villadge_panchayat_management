@@ -1,4 +1,6 @@
 const { prisma } = require('../db');
+const fs = require('fs');
+const path = require('path');
 
 exports.getDashboardStats = async (req, res) => {
   try {
@@ -372,12 +374,14 @@ exports.getProfile = async (req, res) => {
         aadhaar_number: user.profile.aadhaar_number,
         village: user.profile.village || "Sarahi",
         pincode: user.profile.pincode,
-        gender: user.profile.gender
+        gender: user.profile.gender,
+        father_name: user.profile.father_name || ""
       } : {
         aadhaar_number: "Not Linked",
         village: "Sarahi",
         pincode: "",
-        gender: ""
+        gender: "",
+        father_name: ""
       },
       members
     });
@@ -402,7 +406,8 @@ exports.updateProfile = async (req, res) => {
       pincode,
       avatar_url,
       aadhaar_number,
-      bio
+      bio,
+      father_name
     } = req.body;
 
     const user = await prisma.user.findUnique({
@@ -444,6 +449,7 @@ exports.updateProfile = async (req, res) => {
     if (avatar_url !== undefined) profileData.avatar_url = avatar_url;
     if (address !== undefined) profileData.address = address;
     if (dob !== undefined) profileData.date_of_birth = dob ? new Date(dob) : null;
+    if (father_name !== undefined) profileData.father_name = father_name;
     if (aadhaar_number !== undefined) {
       const existingProfile = await prisma.citizenProfile.findFirst({
         where: { aadhaar_number, NOT: { user_id: userId } }
@@ -624,6 +630,53 @@ exports.updateFamilyMember = async (req, res) => {
     res.json({ message: "Family member updated successfully" });
   } catch (error) {
     console.error("Update Family Member Error:", error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+const vaultDocsFilePath = path.join(__dirname, '../../vault_documents.json');
+
+const readVaultDocs = () => {
+  try {
+    if (fs.existsSync(vaultDocsFilePath)) {
+      return JSON.parse(fs.readFileSync(vaultDocsFilePath, 'utf8'));
+    }
+  } catch (error) {
+    console.error("Error reading vault docs:", error);
+  }
+  return {};
+};
+
+const writeVaultDocs = (data) => {
+  try {
+    fs.writeFileSync(vaultDocsFilePath, JSON.stringify(data, null, 2), 'utf8');
+  } catch (error) {
+    console.error("Error writing vault docs:", error);
+  }
+};
+
+exports.getVaultDocuments = async (req, res) => {
+  try {
+    const userId = parseInt(req.params.userId);
+    const allDocs = readVaultDocs();
+    const userDocs = allDocs[userId] || [];
+    res.json(userDocs);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+exports.saveVaultDocuments = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { documents } = req.body;
+    const allDocs = readVaultDocs();
+    allDocs[userId] = documents || [];
+    writeVaultDocs(allDocs);
+    res.json({ message: "Vault documents saved successfully." });
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ detail: "Internal Server Error" });
   }
 };

@@ -25,7 +25,7 @@ export default function CitizenDirectory() {
   }, []);
 
   const userRecord = data[0];
-  const family = userRecord?.family;
+  const family = userRecord?.family_head || userRecord?.family;
 
   return (
     <div className="space-y-8">

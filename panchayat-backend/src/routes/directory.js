@@ -6,5 +6,6 @@ const router = express.Router();
 router.use(authenticateToken);
 
 router.get('/directory', controller.getDirectory);
+router.get('/panchayat/info', controller.getPanchayatInfo);
 
 module.exports = router;

@@ -29,6 +29,7 @@ export default function RegisterPage() {
   const [passwordError, setPasswordError] = useState("");
   const [formData, setFormData] = useState({
     fullName: "",
+    fatherName: "",
     email: "",
     mobile: "",
     aadhaarNumber: "",
@@ -73,6 +74,7 @@ export default function RegisterPage() {
       // Map frontend camelCase to backend snake_case
       const payload = {
         full_name: formData.fullName,
+        father_name: formData.fatherName,
         date_of_birth: formData.dateOfBirth,
         gender: formData.gender,
         aadhaar_number: formData.aadhaarNumber,
@@ -171,6 +173,21 @@ export default function RegisterPage() {
                   placeholder="e.g. Ramesh Kumar Sharma"
                   className="w-full bg-slate-50 border-2 border-transparent px-4 py-3.5 text-sm font-semibold rounded-2xl transition-all focus:bg-white focus:border-primary/20 outline-none"
                   value={formData.fullName}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest pl-1">
+                  Father's Name *
+                </label>
+                <input
+                  type="text"
+                  name="fatherName"
+                  placeholder="e.g. Shri Lalit Kumar"
+                  className="w-full bg-slate-50 border-2 border-transparent px-4 py-3.5 text-sm font-semibold rounded-2xl transition-all focus:bg-white focus:border-primary/20 outline-none"
+                  value={formData.fatherName}
                   onChange={handleChange}
                   required
                 />

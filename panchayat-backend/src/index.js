@@ -28,7 +28,26 @@ app.get('/', (req, res) => {
 });
 
 app.use('/api/auth', require('./routes/auth'));
-app.use('/api/admin', require('./routes/admin'));
+
+const { authenticateToken } = require('./middleware/auth');
+
+const publicPaths = [
+  /^\/api\/upload\/?$/,
+  /^\/api\/certificates\/verify-pub\/[^/]+$/
+];
+
+const selectiveAuth = (req, res, next) => {
+  // Normalize double slashes if any
+  const cleanPath = req.originalUrl.replace(/\/+/g, '/').split('?')[0];
+  const isPublic = publicPaths.some(pattern => pattern.test(cleanPath));
+  if (isPublic) {
+    return next();
+  }
+  return authenticateToken(req, res, next);
+};
+
+app.use('/api/admin', selectiveAuth, require('./routes/admin'));
+app.use('/api', selectiveAuth);
 
 const routes = [
   'notifications',

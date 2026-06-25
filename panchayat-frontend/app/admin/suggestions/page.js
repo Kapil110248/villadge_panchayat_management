@@ -30,8 +30,8 @@ export default function AdminSuggestions() {
     try {
       const token = localStorage.getItem("accessToken");
       await api.put(`/suggestions/${id}/status`, { status: newStatus }, token);
-      setSuggestions(suggestions.map(s => s.id === id ? { ...s, status: newStatus } : s));
       showToast(`Status updated to ${newStatus.replace(/_/g, " ")}`);
+      fetchSuggestions();
     } catch (e) {
       showToast("Status update failed: " + e.message, "error");
     }
@@ -52,14 +52,9 @@ export default function AdminSuggestions() {
   const handleVote = async (id) => {
     try {
       const token = localStorage.getItem("accessToken");
-      const res = await api.post(`/suggestions/${id}/vote`, {}, token);
-      setSuggestions(suggestions.map(s => {
-        if (s.id === id) {
-          return { ...s, votes: [...(s.votes || []), res.vote] };
-        }
-        return s;
-      }));
+      await api.post(`/suggestions/${id}/vote`, {}, token);
       showToast("Suggestion upvoted!");
+      fetchSuggestions();
     } catch (e) {
       showToast(e.message || "You have already upvoted this suggestion", "error");
     }
@@ -134,6 +129,20 @@ export default function AdminSuggestions() {
                   <p className="text-[10px] text-slate-400 font-bold">
                     By {s.citizen?.full_name || "Anonymous"} • {s.submitted_at ? new Date(s.submitted_at).toLocaleDateString("en-IN") : ""}
                   </p>
+
+                  {s.votes && s.votes.length > 0 && (
+                    <div className="text-[10px] text-slate-500 font-semibold bg-white border border-slate-100 rounded-xl px-3 py-1.5 mt-2">
+                      <span className="text-slate-400 font-bold uppercase tracking-wider block text-[8px] mb-0.5">Upvoted By:</span>
+                      {s.votes.map(v => v.citizen?.full_name || "Anonymous").join(", ")}
+                    </div>
+                  )}
+
+                  {s.processed_by && (
+                    <div className="text-[10px] text-slate-500 font-semibold bg-white border border-slate-100 rounded-xl px-3 py-1.5 mt-2">
+                      <span className="text-slate-400 font-bold uppercase tracking-wider block text-[8px] mb-0.5">Processed By:</span>
+                      {s.status === 'accepted' ? 'Accepted' : s.status === 'rejected' ? 'Rejected' : 'Reviewed'} by {s.processed_by.full_name} ({s.processed_by.role})
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0">
                   <button onClick={() => handleVote(s.id)} className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-indigo-50 rounded-xl border border-slate-100 hover:border-indigo-100 transition-colors cursor-pointer group">

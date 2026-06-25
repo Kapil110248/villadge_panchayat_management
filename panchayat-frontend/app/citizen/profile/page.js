@@ -21,6 +21,7 @@ export default function ProfilePage() {
   const [updatingMember, setUpdatingMember] = useState(false);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [vaultDocuments, setVaultDocuments] = useState([]);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const docInputRef = useRef(null);
   const [showDocUploadModal, setShowDocUploadModal] = useState(false);
@@ -53,6 +54,7 @@ export default function ProfilePage() {
   });
   const [editForm, setEditForm] = useState({
     full_name: "",
+    father_name: "",
     email: "",
     mobile: "",
     dob: "",
@@ -76,14 +78,20 @@ export default function ProfilePage() {
       const res = await api.get("/citizen/profile", token);
       setProfileData(res);
       
-      // Load documents from localStorage based on user ID
+      // Load documents from backend with localStorage fallback
       if (res && res.user) {
-        const savedDocs = localStorage.getItem(`vault_docs_${res.user.id}`);
-        if (savedDocs) {
-          try {
-            setVaultDocuments(JSON.parse(savedDocs));
-          } catch (e) {
-            console.error("Error parsing saved documents", e);
+        try {
+          const docs = await api.get(`/citizen/vault-documents/${res.user.id}`, token);
+          setVaultDocuments(docs || []);
+        } catch (err) {
+          console.error("Failed to load vault documents from server", err);
+          const savedDocs = localStorage.getItem(`vault_docs_${res.user.id}`);
+          if (savedDocs) {
+            try {
+              setVaultDocuments(JSON.parse(savedDocs));
+            } catch (e) {
+              console.error("Error parsing saved documents", e);
+            }
           }
         }
       }
@@ -92,6 +100,7 @@ export default function ProfilePage() {
       if (res) {
         setEditForm({
           full_name: res.user.full_name || "",
+          father_name: res.profile.father_name || "",
           email: res.user.email || "",
           mobile: res.user.mobile || "",
           dob: res.user.date_of_birth ? new Date(res.user.date_of_birth).toISOString().split('T')[0] : "",
@@ -166,6 +175,7 @@ export default function ProfilePage() {
       const token = localStorage.getItem("accessToken");
       const payload = {
         full_name: editForm.full_name,
+        father_name: editForm.father_name,
         email: editForm.email,
         mobile: editForm.mobile,
         dob: editForm.dob,
@@ -378,6 +388,11 @@ export default function ProfilePage() {
       setVaultDocuments(newDocs);
       if (profileData && profileData.user) {
         localStorage.setItem(`vault_docs_${profileData.user.id}`, JSON.stringify(newDocs));
+        try {
+          await api.post("/citizen/vault-documents", { documents: newDocs }, token);
+        } catch (err) {
+          console.error("Failed to save vault documents to backend", err);
+        }
       }
       showToast(`${docUploadForm.name} upload ho gya!`);
       setTempFile(null);
@@ -502,6 +517,11 @@ export default function ProfilePage() {
                </div>
 
                <div className="space-y-4 p-6 bg-slate-50/50 rounded-3xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Father's Name</p>
+                  <p className="text-lg font-black text-slate-900">{profile.father_name || "Not Provided"}</p>
+               </div>
+
+               <div className="space-y-4 p-6 bg-slate-50/50 rounded-3xl border border-slate-100">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Email Sync</p>
                   <p className="text-lg font-black text-slate-900">{user.email}</p>
                </div>
@@ -570,16 +590,28 @@ export default function ProfilePage() {
                     vaultDocuments.map((doc, i) => {
                       const IconComponent = doc.icon === "Shield" ? Shield : doc.icon === "Award" ? Award : doc.icon === "Camera" ? Camera : FileText;
                       return (
-                        <div key={i} onClick={() => doc.url && window.open(doc.url, '_blank')} className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-xl rounded-[1.5rem] border border-white/5 hover:bg-white/10 transition-all cursor-pointer group">
-                           <div className="flex items-center gap-4 min-w-0">
+                        <div key={i} className="flex items-center justify-between p-4 bg-white/5 backdrop-blur-xl rounded-[1.5rem] border border-white/5 hover:bg-white/10 transition-all group">
+                           <div onClick={() => doc.url && window.open(doc.url, '_blank')} className="flex items-center gap-4 min-w-0 cursor-pointer flex-1">
                               <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center shrink-0 ${doc.color}`}>
                                  <IconComponent className="w-5 h-5" />
                               </div>
                               <span className="text-xs font-bold truncate">{doc.name}</span>
                            </div>
-                           <span className="text-[8px] font-black uppercase tracking-tighter px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
-                             {doc.status}
-                           </span>
+                           <div className="flex items-center gap-2">
+                             <span className="text-[8px] font-black uppercase tracking-tighter px-2 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0">
+                               {doc.status}
+                             </span>
+                             <button 
+                               type="button" 
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 setDeleteTarget({ index: i, name: doc.name });
+                               }}
+                               className="p-1 hover:bg-white/10 text-white/40 hover:text-rose-400 rounded-lg transition-colors"
+                             >
+                               <X className="w-4 h-4" />
+                             </button>
+                           </div>
                         </div>
                       );
                     })
@@ -647,6 +679,19 @@ export default function ProfilePage() {
                     />
                   </div>
                   <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Father's Name *</label>
+                    <input
+                      required
+                      type="text"
+                      className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 focus:bg-white rounded-xl text-xs font-semibold outline-none"
+                      value={editForm.father_name}
+                      onChange={(e) => setEditForm({ ...editForm, father_name: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Mobile Number *</label>
                     <input
                       required
@@ -656,9 +701,6 @@ export default function ProfilePage() {
                       onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Email ID *</label>
                     <input
@@ -669,6 +711,9 @@ export default function ProfilePage() {
                       onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Gender</label>
                     <select
@@ -681,9 +726,6 @@ export default function ProfilePage() {
                       <option value="other">Other</option>
                     </select>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Date of Birth</label>
                     <input
@@ -693,6 +735,9 @@ export default function ProfilePage() {
                       onChange={(e) => setEditForm({ ...editForm, dob: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Village / Ward *</label>
                     <input
@@ -703,9 +748,6 @@ export default function ProfilePage() {
                       onChange={(e) => setEditForm({ ...editForm, village: e.target.value })}
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Pincode</label>
                     <input
@@ -715,6 +757,9 @@ export default function ProfilePage() {
                       onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Aadhaar Number *</label>
                     <input
@@ -1176,6 +1221,50 @@ export default function ProfilePage() {
                 </Button>
               </div>
             </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-sm relative shadow-2xl border-0 bg-white overflow-hidden rounded-[2rem] p-8 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-6 text-rose-500 border border-rose-100">
+               <AlertCircle className="w-8 h-8" />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-2">Document Hatayein?</h3>
+            <p className="text-sm font-medium text-slate-500 leading-relaxed mb-8">
+              Kya aap sach mein <span className="font-bold text-slate-800">"{deleteTarget.name}"</span> ko apne Digital Vault se hatana chahte hain?
+            </p>
+            <div className="flex gap-3">
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-1/2 py-4 rounded-xl text-xs font-bold border-slate-200" 
+                onClick={() => setDeleteTarget(null)}
+              >
+                Nahi, Cancel
+              </Button>
+              <Button 
+                type="button" 
+                className="w-1/2 py-4 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/10" 
+                onClick={async () => {
+                  const updatedDocs = vaultDocuments.filter((_, index) => index !== deleteTarget.index);
+                  setVaultDocuments(updatedDocs);
+                  const token = localStorage.getItem("accessToken");
+                  localStorage.setItem(`vault_docs_${user.id}`, JSON.stringify(updatedDocs));
+                  try {
+                    await api.post("/citizen/vault-documents", { documents: updatedDocs }, token);
+                  } catch (err) {
+                    console.error("Failed to save vault documents to backend", err);
+                  }
+                  showToast("Document deleted successfully.");
+                  setDeleteTarget(null);
+                }}
+              >
+                Haan, Hatayein
+              </Button>
+            </div>
           </Card>
         </div>
       )}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Sparkles, MessageSquare, ThumbsUp, Calendar, Send, Info } from "lucide-react";
+import { Sparkles, MessageSquare, ThumbsUp, Calendar, Send, Info, CheckCircle, AlertCircle } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function CitizenSuggestions() {
@@ -11,6 +11,12 @@ export default function CitizenSuggestions() {
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "success" }), 3000);
+  };
 
   useEffect(() => {
     fetchSuggestions();
@@ -37,13 +43,13 @@ export default function CitizenSuggestions() {
         title,
         description: desc
       }, token);
-      alert("Idea submitted to suggestion box.");
+      showToast("Idea submitted to suggestion box.");
       setTitle("");
       setDesc("");
       fetchSuggestions();
     } catch (error) {
       console.error("Failed to create suggestion:", error);
-      alert("Failed to submit suggestion.");
+      showToast("Failed to submit suggestion.", "error");
     }
   };
 
@@ -51,11 +57,11 @@ export default function CitizenSuggestions() {
     try {
       const token = localStorage.getItem("accessToken");
       await api.post(`/suggestions/${id}/vote`, {}, token);
-      alert("Sujhaav upvoted successfully!");
+      showToast("Sujhaav upvoted successfully!");
       fetchSuggestions();
     } catch (error) {
       console.error(error);
-      alert("Aap is sujhaav ko pehle hi vote kar chuke hain.");
+      showToast("Aap is sujhaav ko pehle hi vote kar chuke hain.", "error");
     }
   };
 
@@ -98,16 +104,40 @@ export default function CitizenSuggestions() {
                       <p className="text-sm text-slate-500 leading-relaxed font-semibold mt-1">{sug.description}</p>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-slate-100/50 pt-4">
-                      <span className="text-xs text-slate-400 font-bold">Submitted by: {sug.citizen?.full_name || "Citizen"}</span>
-                      <Button
-                        onClick={() => handleVote(sug.id)}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 text-primary border-primary/20 hover:bg-primary/5 rounded-xl font-bold"
-                      >
-                        <ThumbsUp className="w-4 h-4" /> Upvote ({sug.votes?.length || 0})
-                      </Button>
+                    <div className="flex flex-col gap-2 border-t border-slate-100/50 pt-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-400 font-bold">Submitted by: {sug.citizen?.full_name || "Citizen"}</span>
+                        <Button
+                          onClick={() => handleVote(sug.id)}
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 text-primary border-primary/20 hover:bg-primary/5 rounded-xl font-bold"
+                        >
+                          <ThumbsUp className="w-4 h-4" /> Upvote ({sug.votes?.length || 0})
+                        </Button>
+                      </div>
+
+                      {sug.votes && sug.votes.length > 0 && (
+                        <div className="text-xs text-slate-500 font-semibold bg-slate-100/55 rounded-2xl p-3 border border-slate-200/50">
+                          <span className="text-slate-400 font-bold text-[9px] uppercase tracking-widest block mb-1">Upvoted By:</span>
+                          <span className="text-slate-700">{sug.votes.map(v => v.citizen?.full_name || "Anonymous").join(", ")}</span>
+                        </div>
+                      )}
+
+                      {sug.processed_by && (
+                        <div className="text-xs font-semibold bg-slate-100/55 rounded-2xl p-3 border border-slate-200/50 flex items-center justify-between">
+                          <div>
+                            <span className="text-slate-400 font-bold text-[9px] uppercase tracking-widest block mb-1">Action Details:</span>
+                            <span className="text-slate-700">
+                              {sug.status === 'accepted' ? 'Accepted' : sug.status === 'rejected' ? 'Rejected' : 'Status updated'} by{" "}
+                              <span className="font-bold text-slate-900">{sug.processed_by.full_name}</span>
+                            </span>
+                          </div>
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-slate-200 text-slate-700 rounded-md">
+                            {sug.processed_by.role}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))
@@ -162,6 +192,14 @@ export default function CitizenSuggestions() {
           </Card>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-medium ${toast.type === 'error' ? 'bg-rose-500' : 'bg-emerald-500'} flex items-center gap-2 animate-in slide-in-from-top-5`}>
+          {toast.type === 'error' ? <AlertCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }
