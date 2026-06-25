@@ -7,7 +7,7 @@ export const Input = ({ className, label, error, ...props }) => {
       <div className="relative">
         <input
           className={cn(
-            "flex w-full bg-slate-100 border-2 border-transparent px-4 py-3.5 text-sm font-semibold rounded-2xl transition-all duration-300 placeholder:text-slate-400 focus:bg-white focus:border-primary/30 focus:ring-8 focus:ring-primary/5 outline-none disabled:opacity-50",
+            "w-full bg-slate-100 border-2 border-transparent px-4 py-3.5 text-sm font-semibold rounded-2xl transition-all duration-300 placeholder:text-slate-400 focus:bg-white focus:border-primary/30 focus:ring-8 focus:ring-primary/5 outline-none disabled:opacity-50",
             error && "border-rose-500/50 bg-rose-50/50 focus:ring-rose-500/5",
             className
           )}
@@ -26,7 +26,7 @@ export const Select = ({ className, label, error, options = [], ...props }) => {
       <div className="relative group">
         <select
           className={cn(
-            "flex w-full bg-slate-100 border-2 border-transparent px-4 py-3.5 text-sm font-semibold rounded-2xl transition-all duration-300 focus:bg-white focus:border-primary/30 focus:ring-8 focus:ring-primary/5 outline-none appearance-none cursor-pointer",
+            "w-full bg-slate-100 border-2 border-transparent px-4 py-3.5 text-sm font-semibold rounded-2xl transition-all duration-300 focus:bg-white focus:border-primary/30 focus:ring-8 focus:ring-primary/5 outline-none appearance-none cursor-pointer",
             className
           )}
           {...props}

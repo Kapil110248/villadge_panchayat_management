@@ -17,8 +17,13 @@ export default function AdminGramSabha() {
   const [activeMeetingId, setActiveMeetingId] = useState(null);
   const [minutesUrl, setMinutesUrl] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  useEffect(() => { fetchMeetings(); }, []);
+  useEffect(() => { 
+    fetchMeetings(); 
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const fetchMeetings = async () => {
     try {
@@ -26,6 +31,19 @@ export default function AdminGramSabha() {
       const data = await api.get("/admin/gram-sabha", token);
       setMeetings(data);
     } catch (e) { console.error(e); } finally { setLoading(false); }
+  };
+
+  const parseAgenda = (text) => {
+    if (!text) return { tags: [], content: '' };
+    const regex = /\[(.*?)\]/g;
+    let match;
+    const tags = [];
+    let content = text;
+    while ((match = regex.exec(text)) !== null) {
+      tags.push(match[1]);
+      content = content.replace(match[0], '');
+    }
+    return { tags, content: content.trim() };
   };
 
   const handleCreate = async (e) => {
@@ -69,23 +87,6 @@ export default function AdminGramSabha() {
 
   const scheduled = meetings.filter(m => m.status === "scheduled");
   const completed = meetings.filter(m => m.status === "completed");
-
-  const parseAgenda = (rawAgenda) => {
-    let type = "Regular";
-    let officer = "N/A";
-    let quorum = "N/A";
-    let text = rawAgenda || "";
-
-    const typeMatch = text.match(/\[TYPE:(.*?)\]/);
-    const officerMatch = text.match(/\[OFFICER:(.*?)\]/);
-    const quorumMatch = text.match(/\[QUORUM:(.*?)\]/);
-
-    if (typeMatch) { type = typeMatch[1]; text = text.replace(typeMatch[0], ''); }
-    if (officerMatch) { officer = officerMatch[1]; text = text.replace(officerMatch[0], ''); }
-    if (quorumMatch) { quorum = quorumMatch[1]; text = text.replace(quorumMatch[0], ''); }
-
-    return { type, officer, quorum, text: text.trim() };
-  };
 
   return (
     <div className="space-y-8">
@@ -188,42 +189,52 @@ export default function AdminGramSabha() {
                 <p className="text-sm font-bold text-slate-400">No upcoming meetings scheduled</p>
               </div>
             ) : scheduled.map(meet => {
-              const agendaData = parseAgenda(meet.agenda);
+              const hasStarted = currentTime >= new Date(meet.date_time);
               return (
               <div key={meet.id} className="p-6 bg-slate-50 border border-slate-100 rounded-3xl space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-indigo-500/10 text-indigo-600 text-xs font-black rounded-full uppercase tracking-wider">{agendaData.type}</span>
-                    <span className="px-3 py-1 bg-white text-slate-600 border border-slate-200 text-xs font-bold rounded-full uppercase tracking-wider">Quorum: {agendaData.quorum}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-500 font-bold"><Clock className="w-4 h-4" />{new Date(meet.date_time).toLocaleString("en-IN")}</div>
                 </div>
                 <div>
-                   <h3 className="text-lg font-bold text-slate-900">Agenda:</h3>
-                   <p className="text-sm text-slate-600 font-medium bg-white p-4 rounded-2xl border border-slate-100 mt-2">{agendaData.text}</p>
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Meeting Agenda (Mudda)</h3>
+                  <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                    {(() => {
+                      const { tags, content } = parseAgenda(meet.agenda);
+                      return (
+                        <>
+                          {tags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {tags.map((tag, i) => {
+                                const [key, val] = tag.split(':');
+                                return (
+                                  <span key={i} className="px-2.5 py-1 bg-white text-indigo-700 text-[10px] font-black rounded-lg uppercase tracking-wider border border-indigo-100 shadow-sm flex items-center gap-1">
+                                    <span className="text-indigo-400">{key}:</span> {val || ''}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <p className="text-base text-slate-700 font-medium leading-relaxed">{content}</p>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-slate-500 bg-white p-3 rounded-2xl border border-slate-100">
+                <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-slate-600 bg-slate-50 px-5 py-3 rounded-2xl border border-slate-100">
                   <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-rose-500" />{meet.location}</div>
-                  <div className="w-1 h-1 rounded-full bg-slate-300 hidden md:block"></div>
-                  <div className="flex items-center gap-2"><Users className="w-4 h-4 text-indigo-500" />Presiding: {agendaData.officer}</div>
                 </div>
                 
-                {/* Citizen Suggestions */}
-                {meet.suggestions && meet.suggestions.length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Citizen Suggestions ({meet.suggestions.length})</h4>
-                    <div className="max-h-40 overflow-y-auto space-y-2">
-                      {meet.suggestions.map((sug, idx) => (
-                        <div key={idx} className="bg-white p-3 rounded-xl border border-slate-100 text-xs">
-                          <p className="font-semibold text-slate-800">{sug.suggestion_text}</p>
-                          <p className="text-[10px] text-slate-400 mt-1 font-bold">By {sug.citizen?.full_name || "Citizen"}</p>
-                        </div>
-                      ))}
-                    </div>
+                {hasStarted ? (
+                  <Button onClick={() => openCompleteModal(meet.id)} className="w-full sm:w-auto mt-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-200">
+                    <CheckCircle className="w-4 h-4 mr-2" /> Mark Completed & Upload Minutes
+                  </Button>
+                ) : (
+                  <div className="text-xs text-slate-500 font-bold bg-white p-4 rounded-xl border border-slate-200/60 inline-flex items-center gap-2 mt-4">
+                    <Clock className="w-4 h-4 text-slate-400" /> Actions will be enabled once the meeting starts.
                   </div>
                 )}
-                
-                <Button onClick={() => openCompleteModal(meet.id)} className="w-full sm:w-auto mt-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-200"><CheckCircle className="w-4 h-4 mr-2" /> Mark Completed & Upload Minutes</Button>
               </div>
             )})
           }
@@ -236,16 +247,36 @@ export default function AdminGramSabha() {
         <CardContent className="p-0">
           <div className="divide-y divide-slate-100">
             {completed.map(meet => {
-              const agendaData = parseAgenda(meet.agenda);
               return (
               <div key={meet.id} className="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h4 className="font-bold text-slate-900">Gram Sabha — {new Date(meet.date_time).toLocaleDateString("en-IN")}</h4>
-                    <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black rounded uppercase">{agendaData.type}</span>
                   </div>
-                  <p className="text-xs text-slate-500 font-semibold truncate max-w-md">{agendaData.text}</p>
-                  <p className="text-xs text-slate-400 font-bold">Attendance: {meet.attendance?.length || 0} members</p>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Agenda</p>
+                    {(() => {
+                      const { tags, content } = parseAgenda(meet.agenda);
+                      return (
+                        <>
+                          {tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                              {tags.slice(0, 2).map((tag, i) => {
+                                const [key, val] = tag.split(':');
+                                return (
+                                  <span key={i} className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[9px] font-black rounded uppercase tracking-wider border border-slate-200">
+                                    {key}: {val || ''}
+                                  </span>
+                                );
+                              })}
+                              {tags.length > 2 && <span className="text-[9px] font-bold text-slate-400">+{tags.length - 2} more</span>}
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-600 font-semibold line-clamp-2">{content}</p>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
                 {meet.minutes_url ? (
                   <a href={meet.minutes_url} target="_blank" rel="noopener noreferrer">
@@ -276,14 +307,46 @@ export default function AdminGramSabha() {
             </div>
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Minutes Document URL (Optional)</label>
-                <input 
-                  type="text" 
-                  placeholder="https://drive.google.com/..." 
-                  value={minutesUrl} 
-                  onChange={e => setMinutesUrl(e.target.value)}
-                  className="w-full bg-slate-50 border-2 border-transparent focus:border-emerald-500/20 focus:bg-white rounded-xl p-3.5 text-sm font-semibold transition-all outline-none" 
-                />
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Minutes Document (Upload Image/Doc or Paste URL)</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="https://drive.google.com/..." 
+                    value={minutesUrl} 
+                    onChange={e => setMinutesUrl(e.target.value)}
+                    className="flex-1 bg-slate-50 border-2 border-transparent focus:border-emerald-500/20 focus:bg-white rounded-xl p-3.5 text-sm font-semibold transition-all outline-none" 
+                  />
+                  <label className="bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl px-4 py-3.5 text-sm font-semibold cursor-pointer shrink-0 transition-colors flex items-center justify-center border border-slate-200 gap-1.5">
+                    <Download className="w-4 h-4 rotate-180" /> Upload File
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      accept="image/*,application/pdf"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const formData = new FormData();
+                          formData.append("file", file);
+                          const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
+                          const res = await fetch(`${apiUrl}/upload`, {
+                            method: "POST",
+                            body: formData
+                          });
+                          const data = await res.json();
+                          if (data.secure_url) {
+                            setMinutesUrl(data.secure_url);
+                          } else {
+                            alert("Upload failed.");
+                          }
+                        } catch (error) {
+                          console.error(error);
+                          alert("Upload error.");
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
               <Button onClick={submitComplete} className="w-full py-6 rounded-xl text-md font-bold bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20">
                 Confirm & Complete

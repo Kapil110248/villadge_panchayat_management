@@ -1,9 +1,7 @@
 // schema.prisma
 
 generator client {
-  provider = "prisma-client-py"
-  interface = "asyncio"
-  recursive_type_depth = 5
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -39,6 +37,7 @@ enum CertStatus {
 enum ComplaintStatus {
   open
   in_progress
+  resolution_proposed
   resolved
   closed
 }
@@ -55,6 +54,13 @@ model User {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
 
+  // Extended profile fields (editable by any user)
+  avatar_url    String?
+  date_of_birth DateTime?
+  address       String?   @db.Text
+  bio           String?   @db.Text
+  citizen_notifications CitizenNotification[]
+
   // Relations
   profile            CitizenProfile?
   certificates       Certificate[]
@@ -62,6 +68,7 @@ model User {
   assigned_complaints Complaint[]    @relation("AssignedTo")
   schemes_created    Scheme[]
   notices            Notice[]
+  sent_notifications AdminNotification[]
   
   // Admin actions
   reviewed_requests  RegistrationRequest[] @relation("ReviewedBy")
@@ -80,6 +87,8 @@ model User {
   votes              SuggestionVote[]
   ration_receipts    RationReceipt[]
   camp_registrations CampRegistration[]
+  scheme_applications SchemeApplication[]
+  sabha_replies      SabhaSuggestionReply[]
 }
 
 // 2. Registration Requests (For public signups)
@@ -152,8 +161,13 @@ model Complaint {
   subject          String
   description      String          @db.Text
   location         String?
+  image_url        String?
   status           ComplaintStatus @default(open)
   priority         String          @default("medium") // low, medium, high
+  
+  admin_reply          String?         @db.Text
+  resolution_image_url String?
+  citizen_confirmed    Boolean         @default(false)
   
   assigned_to_id   Int?
   submitted_at     DateTime        @default(now())
@@ -171,8 +185,29 @@ model Scheme {
   is_active    Boolean   @default(true)
   created_by_id Int
   
+  category     String?
+  benefit      String?
+  icon         String?
+  color_theme  String?
+  form_fields  Json?     // Dynamic form fields defined by admin
+  
   created_at   DateTime  @default(now())
   creator      User      @relation(fields: [created_by_id], references: [id])
+  applications SchemeApplication[]
+}
+
+model SchemeApplication {
+  id           Int       @id @default(autoincrement())
+  scheme_id    Int
+  citizen_id   Int
+  status       String    @default("Pending") // Pending, Ready, Approved, Rejected
+  form_data    Json?     // Citizen's submitted form data
+  admin_remarks String?   @db.Text
+  result_file   String?   // Certificate / Document uploaded by admin
+  submitted_at DateTime  @default(now())
+  
+  scheme       Scheme    @relation(fields: [scheme_id], references: [id], onDelete: Cascade)
+  citizen      User      @relation(fields: [citizen_id], references: [id])
 }
 
 // 11. Notices
@@ -198,6 +233,7 @@ model GramSabhaMeeting {
   status          String             @default("scheduled") // scheduled, completed, cancelled
   notice_published Boolean           @default(false)
   minutes_url     String?            // PDF path for meeting minutes
+  resolutions     String?            @db.Text
   created_at      DateTime           @default(now())
   
   suggestions     SabhaSuggestion[]
@@ -212,6 +248,18 @@ model SabhaSuggestion {
   submitted_at    DateTime           @default(now())
   
   meeting         GramSabhaMeeting   @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
+  citizen         User               @relation(fields: [citizen_id], references: [id])
+  replies         SabhaSuggestionReply[]
+}
+
+model SabhaSuggestionReply {
+  id              Int                @id @default(autoincrement())
+  suggestion_id   Int
+  citizen_id      Int
+  reply_text      String             @db.Text
+  created_at      DateTime           @default(now())
+
+  suggestion      SabhaSuggestion   @relation(fields: [suggestion_id], references: [id], onDelete: Cascade)
   citizen         User               @relation(fields: [citizen_id], references: [id])
 }
 
@@ -239,6 +287,7 @@ model DevelopmentProject {
   before_image          String?      // Image URL
   after_image           String?      // Image URL
   status                String       @default("planning") // planning, active, completed, suspended
+  updated_by            String?      // Name of user who last updated progress
   created_at            DateTime     @default(now())
 }
 
@@ -458,4 +507,21 @@ model AdminNotification {
   is_read         Boolean            @default(false)
   action_url      String?            // Optional link to redirect the admin when clicked
   created_at      DateTime           @default(now())
+
+  sender_id       Int?
+  sender          User?              @relation(fields: [sender_id], references: [id])
+}
+
+// 26. Citizen Notifications
+model CitizenNotification {
+  id              Int                @id @default(autoincrement())
+  citizen_id      Int
+  title           String
+  message         String             @db.Text
+  type            String             // complaint_update, message, etc.
+  is_read         Boolean            @default(false)
+  action_url      String?            
+  created_at      DateTime           @default(now())
+
+  citizen         User               @relation(fields: [citizen_id], references: [id])
 }

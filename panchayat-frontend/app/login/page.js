@@ -33,6 +33,7 @@ export default function LoginPage() {
         localStorage.setItem("userEmail", email);
         localStorage.setItem("userName", response.user.name);
         localStorage.setItem("userId", response.user.id);
+        if (response.user.avatar_url) localStorage.setItem("userAvatar", response.user.avatar_url);
         
         router.push("/citizen/dashboard");
       } catch (error) {
@@ -55,6 +56,7 @@ export default function LoginPage() {
         localStorage.setItem("userEmail", email);
         localStorage.setItem("userName", response.user.name);
         localStorage.setItem("userId", response.user.id);
+        if (response.user.avatar_url) localStorage.setItem("userAvatar", response.user.avatar_url);
         
         if (role === "admin") router.push("/admin/dashboard");
         else if (role === "clerk") router.push("/clerk/dashboard");

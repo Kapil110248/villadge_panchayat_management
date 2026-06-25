@@ -27,6 +27,7 @@ const searchItems = [
 
 export function Navbar({ role, onMenuClick }) {
   const [userName, setUserName] = useState("Ramesh Kumar");
+  const [userAvatar, setUserAvatar] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
   const [notifications, setNotifications] = useState([]);
@@ -41,16 +42,25 @@ export function Navbar({ role, onMenuClick }) {
     try {
       const token = localStorage.getItem("accessToken");
       if (!token) return;
-      const res = await api.get("/notifications", token);
-      setNotifications(res.notifications);
-      setUnreadCount(res.unread_count);
+      const endpoint = role === "citizen" ? "/citizen/notifications" : "/notifications";
+      const res = await api.get(endpoint, token);
+      
+      // The citizen endpoint returns an array, the admin returns { notifications, unread_count }
+      if (role === "citizen") {
+        setNotifications(res);
+        setUnreadCount(res.filter(n => !n.is_read).length);
+      } else {
+        setNotifications(res.notifications || []);
+        setUnreadCount(res.unread_count || 0);
+      }
     } catch (e) { console.error("Failed to fetch notifications"); }
   };
 
   const markAsRead = async (id, url) => {
     try {
       const token = localStorage.getItem("accessToken");
-      await api.put(`/notifications/${id}/read`, {}, token);
+      const endpoint = role === "citizen" ? `/citizen/notifications/${id}/read` : `/notifications/${id}/read`;
+      await api.put(endpoint, {}, token);
       fetchNotifications();
       if (url) {
         setShowNotifications(false);
@@ -62,22 +72,33 @@ export function Navbar({ role, onMenuClick }) {
   const markAllRead = async () => {
     try {
       const token = localStorage.getItem("accessToken");
-      await api.put(`/notifications/read-all`, {}, token);
+      const endpoint = role === "citizen" ? `/citizen/notifications/read-all` : `/notifications/read-all`;
+      await api.put(endpoint, {}, token);
       fetchNotifications();
     } catch (e) {}
   };
 
   useEffect(() => {
-    const storedName = localStorage.getItem("userName");
-    if (storedName) setUserName(storedName);
+    const handleAvatarUpdate = () => {
+      const storedName = localStorage.getItem("userName");
+      if (storedName) setUserName(storedName);
+      const storedAvatar = localStorage.getItem("userAvatar");
+      if (storedAvatar) setUserAvatar(storedAvatar);
+    };
+    
+    handleAvatarUpdate();
+    window.addEventListener("avatarUpdated", handleAvatarUpdate);
     
     // Fetch immediately
     fetchNotifications();
     
     // Poll every 30 seconds
     const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      window.removeEventListener("avatarUpdated", handleAvatarUpdate);
+      clearInterval(interval);
+    };
+  }, [role]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -228,13 +249,22 @@ export function Navbar({ role, onMenuClick }) {
                         onClick={() => markAsRead(notif.id, notif.action_url)}
                       >
                         <div className="flex gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${!notif.is_read ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-100 text-slate-400'}`}>
-                            {notif.type === 'complaint' ? <MessageSquare className="w-4 h-4" /> : 
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${!notif.is_read ? 'bg-primary text-white shadow-md shadow-primary/20' : 'bg-slate-100 text-slate-400'}`}>
+                            {notif.sender?.avatar_url ? (
+                               <img src={notif.sender.avatar_url.startsWith('http') ? notif.sender.avatar_url : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:8001'}${notif.sender.avatar_url}`} alt="Sender" className="w-full h-full object-cover" />
+                            ) : notif.type === 'complaint' ? <MessageSquare className="w-4 h-4" /> : 
                              notif.type === 'certificate' ? <FileText className="w-4 h-4" /> : 
                              notif.type === 'leave' ? <User className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
                           </div>
                           <div>
-                            <p className={`text-sm mb-1 ${!notif.is_read ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>{notif.title}</p>
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className={`text-sm ${!notif.is_read ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>{notif.title}</p>
+                              {notif.sender && (
+                                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full line-clamp-1 break-all">
+                                  {notif.sender.full_name} {notif.sender.mobile ? `(${notif.sender.mobile})` : ''}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-xs text-slate-500 font-medium leading-relaxed">{notif.message}</p>
                             <p className="text-[10px] text-slate-400 font-bold mt-2 uppercase tracking-widest">
                               {new Date(notif.created_at).toLocaleString("en-IN", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
@@ -258,7 +288,11 @@ export function Navbar({ role, onMenuClick }) {
           <Link href={`/${role}/profile`} className="relative group cursor-pointer block">
              <div className="w-12 h-12 bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl flex items-center justify-center border border-primary/20 p-1 group-hover:scale-105 transition-transform">
                 <div className="w-full h-full bg-white rounded-xl flex items-center justify-center overflow-hidden">
-                   <User className="w-6 h-6 text-primary" />
+                   {userAvatar ? (
+                     <img src={userAvatar.startsWith('http') ? userAvatar : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:8001'}${userAvatar}`} alt="Profile" className="w-full h-full object-cover" />
+                   ) : (
+                     <User className="w-6 h-6 text-primary" />
+                   )}
                 </div>
              </div>
              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />

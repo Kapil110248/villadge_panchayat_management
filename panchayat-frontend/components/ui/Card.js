@@ -11,11 +11,11 @@ export const Card = ({ className, children, ...props }) => {
   );
 };
 
-export const CardHeader = ({ className, title, subtitle, children, ...props }) => {
+export const CardHeader = ({ className, title, subtitle, titleClassName, subtitleClassName, children, ...props }) => {
   return (
     <div className={cn("px-8 py-8 border-b border-slate-50", className)} {...props}>
-      {title && <h3 className="text-xl font-black text-slate-900 tracking-tight">{title}</h3>}
-      {subtitle && <p className="text-sm font-medium text-slate-400 mt-1">{subtitle}</p>}
+      {title && <h3 className={cn("text-xl font-black text-slate-900 tracking-tight", titleClassName)}>{title}</h3>}
+      {subtitle && <p className={cn("text-sm font-medium text-slate-400 mt-1", subtitleClassName)}>{subtitle}</p>}
       {children}
     </div>
   );

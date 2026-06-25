@@ -2,12 +2,27 @@
   "name": "panchayat-backend",
   "version": "1.0.0",
   "description": "Backend for Village Panchayat Management System",
-  "main": "app/main.py",
+  "main": "src/index.js",
   "scripts": {
-    "dev": "python -m uvicorn app.main:app --reload",
-    "start": "python -m uvicorn app.main:app"
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@prisma/client": "^5.10.2",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
+    "uuid": "^14.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prisma": "^5.10.2"
+  }
 }

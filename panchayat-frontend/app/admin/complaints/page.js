@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { MessageSquare, Clock, CheckCircle, AlertCircle, Search, Filter, Shield, X } from "lucide-react";
+import { MessageSquare, Clock, CheckCircle, AlertCircle, Search, Filter, Shield, X, Phone } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function AdminComplaints() {
@@ -12,7 +12,8 @@ export default function AdminComplaints() {
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
   
   const [selectedComplaint, setSelectedComplaint] = useState(null);
-  const [messageModal, setMessageModal] = useState({ show: false, citizenName: "", message: "" });
+  const [messageModal, setMessageModal] = useState({ show: false, citizenName: "", message: "", complaintId: null });
+  const [resolutionModal, setResolutionModal] = useState({ show: false, complaintId: null, message: "", photo: null, uploading: false });
 
   const fetchComplaints = async () => {
     try {
@@ -47,11 +48,53 @@ export default function AdminComplaints() {
     }
   };
 
-  const handleMessageSubmit = (e) => {
+  const handleMessageSubmit = async (e) => {
     e.preventDefault();
     if (messageModal.message.trim()) {
-      showToast(`Message sent to ${messageModal.citizenName}!`, "success");
-      setMessageModal({ show: false, citizenName: "", message: "" });
+      try {
+        const token = localStorage.getItem("accessToken");
+        await api.post(`/admin/complaints/${messageModal.complaintId}/message`, { message: messageModal.message }, token);
+        showToast(`Message sent to ${messageModal.citizenName}!`, "success");
+        setMessageModal({ show: false, citizenName: "", message: "", complaintId: null });
+      } catch (err) {
+        showToast("Error sending message: " + err.message, "error");
+      }
+    }
+  };
+
+  const handleResolutionSubmit = async (e) => {
+    e.preventDefault();
+    setResolutionModal(prev => ({ ...prev, uploading: true }));
+    try {
+      const token = localStorage.getItem("accessToken");
+      let photo_url = null;
+      if (resolutionModal.photo) {
+        const formDataUpload = new FormData();
+        formDataUpload.append("file", resolutionModal.photo);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
+        const uploadRes = await fetch(`${apiUrl}/upload`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+          body: formDataUpload
+        });
+        if (!uploadRes.ok) throw new Error("File upload failed");
+        const uploadData = await uploadRes.json();
+        photo_url = uploadData.secure_url;
+      }
+
+      await api.put(`/admin/complaints/${resolutionModal.complaintId}/status`, { 
+        status: "resolution_proposed",
+        message: resolutionModal.message,
+        image_url: photo_url
+      }, token);
+
+      showToast("Resolution proposed to citizen!");
+      setResolutionModal({ show: false, complaintId: null, message: "", photo: null, uploading: false });
+      setSelectedComplaint(null);
+      fetchComplaints();
+    } catch (err) {
+      showToast("Error proposing resolution: " + err.message, "error");
+      setResolutionModal(prev => ({ ...prev, uploading: false }));
     }
   };
 
@@ -68,18 +111,36 @@ export default function AdminComplaints() {
       {/* Review Details Modal */}
       {selectedComplaint && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-lg p-6 relative shadow-2xl border-0">
-            <button onClick={() => setSelectedComplaint(null)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
-              <X className="w-4 h-4" />
-            </button>
-            <div className="mb-6">
-              <h2 className="text-xl font-black text-slate-900">Complaint Details</h2>
-              <p className="text-sm font-medium text-slate-500">Ref: {selectedComplaint.ref_id}</p>
-            </div>
-            <div className="space-y-4 mb-6">
+          <Card className="w-full max-w-lg shadow-2xl border-0 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 shrink-0 flex justify-between items-start border-b border-slate-100">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Citizen</label>
-                <p className="text-sm font-bold text-slate-900">{selectedComplaint.citizen}</p>
+                <h2 className="text-xl font-black text-slate-900">Complaint Details</h2>
+                <p className="text-sm font-medium text-slate-500 mt-1">Ref: {selectedComplaint.ref_id}</p>
+              </div>
+              <button onClick={() => setSelectedComplaint(null)} className="p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <div className="space-y-4 mb-6">
+              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                  <Shield className="w-5 h-5" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Citizen</label>
+                  <p className="text-sm font-bold text-slate-900">{selectedComplaint.citizen}</p>
+                </div>
+                {selectedComplaint.citizen_mobile && selectedComplaint.citizen_mobile !== "N/A" && (
+                  <div className="ml-auto flex flex-col items-end">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Contact</label>
+                    <div className="flex items-center gap-1 text-sm font-bold text-slate-700">
+                      <Phone className="w-3 h-3" />
+                      {selectedComplaint.citizen_mobile}
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</label>
@@ -87,14 +148,42 @@ export default function AdminComplaints() {
                   {selectedComplaint.description || "No description provided."}
                 </div>
               </div>
+              {selectedComplaint.image_url && selectedComplaint.image_url !== "null" && (
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Attached Photo</label>
+                  <img src={selectedComplaint.image_url.startsWith('http') ? selectedComplaint.image_url : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:8001'}${selectedComplaint.image_url}`} alt="Complaint Attachment" className="w-full mt-1 max-h-60 object-cover rounded-xl border border-slate-200" />
+                </div>
+              )}
+              
+              {(selectedComplaint.status === "Resolved" || selectedComplaint.status === "Resolution Proposed") && selectedComplaint.admin_reply && (
+                <div className="mt-6 border-t border-slate-100 pt-6">
+                  <h4 className="text-sm font-black text-slate-900 mb-2">Admin Resolution Details</h4>
+                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 mb-4">
+                    <p className="text-sm font-semibold text-emerald-900">{selectedComplaint.admin_reply}</p>
+                  </div>
+                  {selectedComplaint.resolution_image_url && selectedComplaint.resolution_image_url !== "null" && (
+                    <div className="mb-4">
+                      <img src={selectedComplaint.resolution_image_url.startsWith('http') ? selectedComplaint.resolution_image_url : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:8001'}${selectedComplaint.resolution_image_url}`} alt="Resolution Proof" className="w-full max-h-60 object-cover rounded-xl border border-slate-200" />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
-               <Button onClick={() => handleStatusUpdate(selectedComplaint.id, "In Progress")} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200">
-                 Mark In Progress
-               </Button>
-               <Button onClick={() => handleStatusUpdate(selectedComplaint.id, "Resolved")} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200">
-                 Mark Resolved
-               </Button>
+               {selectedComplaint.status === "Open" && (
+                 <Button onClick={() => handleStatusUpdate(selectedComplaint.id, "In Progress")} className="flex-1 bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-200">
+                   Mark In Progress
+                 </Button>
+               )}
+               {selectedComplaint.status !== "Resolved" && selectedComplaint.status !== "Resolution Proposed" && (
+                 <Button onClick={() => {
+                    setResolutionModal({ show: true, complaintId: selectedComplaint.id, message: "", photo: null, uploading: false });
+                    setSelectedComplaint(null);
+                 }} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200">
+                   Propose Resolution
+                 </Button>
+               )}
+              </div>
             </div>
           </Card>
         </div>
@@ -104,7 +193,7 @@ export default function AdminComplaints() {
       {messageModal.show && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <Card className="w-full max-w-md p-6 relative shadow-2xl border-0">
-            <button onClick={() => setMessageModal({ show: false, citizenName: "", message: "" })} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+            <button onClick={() => setMessageModal({ show: false, citizenName: "", message: "", complaintId: null })} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
               <X className="w-4 h-4" />
             </button>
             <div className="mb-6">
@@ -122,6 +211,46 @@ export default function AdminComplaints() {
               />
               <Button type="submit" className="w-full py-6 rounded-xl text-sm shadow-xl shadow-primary/20">
                 Send Message
+              </Button>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* Resolution Modal */}
+      {resolutionModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md p-6 relative shadow-2xl border-0">
+            <button onClick={() => setResolutionModal({ show: false, complaintId: null, message: "", photo: null, uploading: false })} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+              <X className="w-4 h-4" />
+            </button>
+            <div className="mb-6">
+              <h2 className="text-xl font-black text-slate-900">Propose Resolution</h2>
+              <p className="text-sm font-medium text-slate-500">Provide proof to the citizen.</p>
+            </div>
+            <form onSubmit={handleResolutionSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">Resolution Message</label>
+                <textarea 
+                  required 
+                  rows={3}
+                  className="w-full p-4 bg-slate-50 border-2 border-transparent focus:border-emerald-500/20 focus:bg-white rounded-xl text-sm font-semibold transition-all outline-none resize-none" 
+                  value={resolutionModal.message} 
+                  onChange={e => setResolutionModal({...resolutionModal, message: e.target.value})} 
+                  placeholder="Describe how the issue was resolved..." 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">Proof Photo (Optional)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={e => setResolutionModal({...resolutionModal, photo: e.target.files[0]})}
+                  className="w-full p-2 bg-slate-50 rounded-xl text-sm"
+                />
+              </div>
+              <Button type="submit" disabled={resolutionModal.uploading} className="w-full py-6 rounded-xl text-sm bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20">
+                {resolutionModal.uploading ? "Sending Proof..." : "Send to Citizen"}
               </Button>
             </form>
           </Card>
@@ -157,7 +286,17 @@ export default function AdminComplaints() {
                        <span className="text-[10px] bg-slate-100 px-3 py-1 rounded-full text-slate-500 font-black uppercase tracking-widest">{complaint.category}</span>
                        {complaint.urgent && <span className="text-[10px] bg-rose-500 text-white px-2 py-1 rounded-xl font-black uppercase tracking-tighter">URGENT</span>}
                     </div>
-                    <p className="text-sm text-slate-400 font-bold">Ref: {complaint.ref_id} • Posted on {complaint.date}</p>
+                    <div className="flex items-center gap-3 text-sm text-slate-400 font-bold">
+                      <p>Ref: {complaint.ref_id}</p>
+                      {complaint.citizen_mobile && complaint.citizen_mobile !== "N/A" && (
+                        <>
+                          <span>•</span>
+                          <p className="flex items-center gap-1"><Phone className="w-3 h-3" /> {complaint.citizen_mobile}</p>
+                        </>
+                      )}
+                      <span>•</span>
+                      <p>Posted on {complaint.date}</p>
+                    </div>
                   </div>
                 </div>
 
@@ -169,10 +308,12 @@ export default function AdminComplaints() {
                         complaint.status === 'Resolved' ? 'text-emerald-600' : 'text-amber-600'
                       }`}>{complaint.status}</p>
                    </div>
-                   <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setSelectedComplaint(complaint)}>Review Details</Button>
-                      <Button className="bg-slate-900" size="sm" onClick={() => setMessageModal({ show: true, citizenName: complaint.citizen, message: "" })}>Direct Message</Button>
-                   </div>
+                     <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedComplaint(complaint)}>Review Details</Button>
+                        {!complaint.admin_reply && (
+                           <Button className="bg-slate-900" size="sm" onClick={() => setMessageModal({ show: true, citizenName: complaint.citizen, message: "", complaintId: complaint.id })}>Direct Message</Button>
+                        )}
+                     </div>
                 </div>
               </div>
             </CardContent>

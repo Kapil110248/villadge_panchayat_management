@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Users, Search, Phone, Mail, MapPin, Download } from "lucide-react";
+import { Users, Search, Phone, Mail, MapPin, Download, X } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function AdminDirectory() {
   const [citizens, setCitizens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => { fetchDirectory(); }, []);
 
@@ -81,8 +82,17 @@ export default function AdminDirectory() {
                   <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-xl flex items-center justify-center text-white text-xs font-black">
-                          {c.full_name?.charAt(0) || "?"}
+                        <div onClick={() => {
+                          const imgUrl = c.avatar_url || c.profile?.avatar_url;
+                          if (imgUrl) {
+                            setSelectedImage(imgUrl.startsWith('http') ? imgUrl : `http://localhost:8000${imgUrl}`);
+                          }
+                        }} className={`w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-xl flex items-center justify-center text-white text-xs font-black overflow-hidden ${(c.avatar_url || c.profile?.avatar_url) ? 'cursor-pointer' : ''}`}>
+                          {c.avatar_url || c.profile?.avatar_url ? (
+                            <img src={(c.avatar_url || c.profile?.avatar_url).startsWith('http') ? (c.avatar_url || c.profile?.avatar_url) : `http://localhost:8000${c.avatar_url || c.profile?.avatar_url}`} alt={c.full_name} className="w-full h-full object-cover" />
+                          ) : (
+                            c.full_name?.charAt(0) || "?"
+                          )}
                         </div>
                         <span className="text-sm font-bold text-slate-900">{c.full_name}</span>
                       </div>
@@ -101,6 +111,18 @@ export default function AdminDirectory() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Image Modal */}
+      {selectedImage && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={() => setSelectedImage(null)}>
+          <div className="relative max-w-2xl w-full max-h-[80vh] flex items-center justify-center" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setSelectedImage(null)} className="absolute -top-12 right-0 p-2 text-white/70 hover:text-white transition-colors">
+              <X className="w-8 h-8" />
+            </button>
+            <img src={selectedImage} alt="Citizen Avatar" className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

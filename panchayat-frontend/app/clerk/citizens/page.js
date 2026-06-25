@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Users, Search, UserPlus, Filter, MoreVertical, Edit2, Trash2, Eye, X } from "lucide-react";
+import { Users, Search, UserPlus, Filter, MoreVertical, Edit2, Trash2, Eye, X, Download } from "lucide-react";
 import { api } from "@/lib/api";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export default function CitizenManagement() {
   const [citizens, setCitizens] = useState([]);
@@ -17,6 +19,54 @@ export default function CitizenManagement() {
   const [citizenToDelete, setCitizenToDelete] = useState(null);
   const [viewProfileOpen, setViewProfileOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedWardFilter, setSelectedWardFilter] = useState("All");
+
+  const filteredCitizens = citizens.filter(citizen => {
+    const matchesSearch = citizen.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          citizen.phone?.includes(searchQuery) ||
+                          citizen.ward?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesWard = selectedWardFilter === "All" || citizen.ward === selectedWardFilter;
+    return matchesSearch && matchesWard;
+  });
+
+  const exportToPDF = () => {
+    try {
+      const doc = new jsPDF("landscape");
+      doc.text("Citizen Management Report", 14, 15);
+      
+      const tableColumn = ["Name", "Ward", "Contact", "Email", "Gender", "DOB", "Aadhaar", "Address", "Status"];
+      const tableRows = [];
+
+      filteredCitizens.forEach(citizen => {
+        const citizenData = [
+          citizen.name || "N/A",
+          citizen.ward || "N/A",
+          citizen.phone || "N/A",
+          citizen.email || "N/A",
+          citizen.gender || "N/A",
+          citizen.dob || "N/A",
+          citizen.aadhaar || "N/A",
+          citizen.address || "N/A",
+          citizen.status || "N/A",
+        ];
+        tableRows.push(citizenData);
+      });
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 20,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [41, 128, 185] },
+      });
+      
+      doc.save("citizens_report.pdf");
+    } catch (err) {
+      console.error("PDF Export error:", err);
+      alert("Failed to export PDF. Please try restarting the development server.");
+    }
+  };
   
   const [formData, setFormData] = useState({
     full_name: "",
@@ -171,11 +221,20 @@ export default function CitizenManagement() {
         <CardHeader className="flex flex-row items-center justify-between gap-4 py-4">
           <div className="flex-1 max-w-sm relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <Input className="pl-10" placeholder="Search by name, phone or ward..." />
+            <Input className="pl-10" placeholder="Search by name, phone or ward..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm"><Filter className="w-4 h-4 mr-2" /> Ward</Button>
-            <Button variant="outline" size="sm">Export CSV</Button>
+          <div className="flex gap-2 items-center">
+            <div className="relative flex items-center">
+              <select className="px-4 py-2 border border-slate-200 rounded-full text-sm outline-none focus:border-primary/50 appearance-none bg-white font-medium hover:bg-slate-50 transition-colors cursor-pointer" value={selectedWardFilter} onChange={e => setSelectedWardFilter(e.target.value)}>
+                 <option value="All">All Wards</option>
+                 <option value="Ward 01">Ward 01</option>
+                 <option value="Ward 02">Ward 02</option>
+                 <option value="Sarahi">Sarahi</option>
+              </select>
+            </div>
+            <Button variant="outline" size="sm" onClick={exportToPDF} className="flex items-center gap-2 rounded-full px-4">
+              <Download className="w-4 h-4" /> Export PDF
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -193,9 +252,9 @@ export default function CitizenManagement() {
               <tbody className="divide-y divide-border">
                 {loading ? (
                   <tr><td colSpan="5" className="p-6 text-center text-slate-500 font-bold animate-pulse">Loading citizens...</td></tr>
-                ) : citizens.length === 0 ? (
+                ) : filteredCitizens.length === 0 ? (
                   <tr><td colSpan="5" className="p-6 text-center text-slate-500 font-bold">No citizens found</td></tr>
-                ) : citizens.map((citizen) => (
+                ) : filteredCitizens.map((citizen) => (
                   <tr key={citizen.id} className="hover:bg-slate-50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -222,12 +281,16 @@ export default function CitizenManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleViewProfile(citizen)} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-md transition-colors"><Eye className="w-4 h-4" /></button>
-                        <button onClick={() => handleOpenModal(citizen)} className="p-1.5 hover:bg-amber-50 text-amber-600 rounded-md transition-colors"><Edit2 className="w-4 h-4" /></button>
-                        <button onClick={() => handleDeleteClick(citizen.id)} className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-md transition-colors"><Trash2 className="w-4 h-4" /></button>
+                      <div className="relative inline-flex justify-end items-center h-8 w-24">
+                        {/* Three-dot icon — hidden on hover via opacity */}
+                        <MoreVertical className="w-4 h-4 text-slate-400 group-hover:opacity-0 transition-opacity absolute right-0" />
+                        {/* Action buttons — visible only on hover */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute right-0">
+                          <button onClick={() => handleViewProfile(citizen)} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-md transition-colors"><Eye className="w-4 h-4" /></button>
+                          <button onClick={() => handleOpenModal(citizen)} className="p-1.5 hover:bg-amber-50 text-amber-600 rounded-md transition-colors"><Edit2 className="w-4 h-4" /></button>
+                          <button onClick={() => handleDeleteClick(citizen.id)} className="p-1.5 hover:bg-rose-50 text-rose-600 rounded-md transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
                       </div>
-                      <button className="p-1.5 text-slate-400 group-hover:hidden"><MoreVertical className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -235,7 +298,7 @@ export default function CitizenManagement() {
             </table>
           </div>
           <div className="p-6 border-t border-border flex items-center justify-between text-sm">
-            <p className="text-slate-500 text-xs">Showing {citizens.length} citizens</p>
+            <p className="text-slate-500 text-xs">Showing {filteredCitizens.length} citizens</p>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" disabled>Previous</Button>
               <Button variant="outline" size="sm" disabled>Next</Button>
@@ -247,25 +310,25 @@ export default function CitizenManagement() {
       {/* Modal Overlay */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-md shadow-2xl">
-            <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
+          <Card className="w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl">
+            <CardHeader className="flex flex-row items-center justify-between border-b pb-4 shrink-0">
               <h2 className="text-xl font-bold">{isEdit ? "Edit Citizen" : "Add New Citizen"}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
             </CardHeader>
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 overflow-y-auto flex-1">
               <form onSubmit={handleSave} className="space-y-4">
                 <div className="space-y-1">
                   <label className="text-xs font-bold uppercase text-slate-500">Full Name</label>
                   <Input required value={formData.full_name} onChange={e => setFormData({...formData, full_name: e.target.value})} placeholder="e.g. Ramesh Sharma" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold uppercase text-slate-500">Mobile</label>
                     <Input required value={formData.mobile} onChange={e => setFormData({...formData, mobile: e.target.value})} placeholder="10 digits" />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-bold uppercase text-slate-500">Gender</label>
-                    <select required value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary">
+                    <select required value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary bg-white">
                       <option>Male</option>
                       <option>Female</option>
                       <option>Other</option>
@@ -282,7 +345,7 @@ export default function CitizenManagement() {
                     <Input required type="password" value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})} placeholder="******" />
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold uppercase text-slate-500">Ward / Village</label>
                     <select className="w-full border border-slate-200 rounded-lg p-2.5 text-sm outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 bg-white" required value={formData.ward} onChange={(e) => setFormData({...formData, ward: e.target.value})}>
@@ -298,15 +361,15 @@ export default function CitizenManagement() {
                       <option value="Inactive">Inactive</option>
                     </select>
                   </div>
-                  <div className="col-span-2 space-y-1">
+                  <div className="col-span-1 sm:col-span-2 space-y-1">
                     <label className="text-xs font-bold uppercase text-slate-500">Aadhaar Number</label>
                     <Input type="text" placeholder="1234 5678 9012" value={formData.aadhaar_number} onChange={(e) => setFormData({...formData, aadhaar_number: e.target.value})} />
                   </div>
-                  <div className="col-span-2 space-y-1">
+                  <div className="col-span-1 sm:col-span-2 space-y-1">
                     <label className="text-xs font-bold uppercase text-slate-500">Date of Birth</label>
                     <Input type="date" value={formData.dob} onChange={(e) => setFormData({...formData, dob: e.target.value})} />
                   </div>
-                  <div className="col-span-2 space-y-1">
+                  <div className="col-span-1 sm:col-span-2 space-y-1">
                     <label className="text-xs font-bold uppercase text-slate-500">Full Address</label>
                     <Input type="text" placeholder="House No, Street, Village" value={formData.address} onChange={(e) => setFormData({...formData, address: e.target.value})} />
                   </div>

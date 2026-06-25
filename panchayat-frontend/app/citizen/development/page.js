@@ -135,6 +135,13 @@ export default function CitizenDevelopment() {
                     </span>
                   </div>
                 </div>
+
+                {project.updated_by && (
+                  <div className="border-t border-slate-50 pt-3 flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <span>Last Updated By:</span>
+                    <span className="text-primary">{project.updated_by}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))
