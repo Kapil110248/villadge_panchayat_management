@@ -243,14 +243,10 @@ export default function LandingPage() {
 
             {/* Login Buttons */}
             <div className="hidden md:flex items-center gap-2">
-              <Link href="/login" className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-[#138808] rounded-xl hover:bg-emerald-50 transition-all">
-                Citizen Login
-              </Link>
-              <Link href="/login" className="px-4 py-2 text-sm font-bold text-slate-600 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-all">
-                Clerk Login
-              </Link>
+              
+           
               <Link href="/login" className="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-[#138808] to-emerald-600 rounded-xl hover:shadow-lg hover:shadow-emerald-500/25 transition-all hover:-translate-y-0.5 active:translate-y-0">
-                Admin Login
+                 Login and Register
               </Link>
             </div>
 
