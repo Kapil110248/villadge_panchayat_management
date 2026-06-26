@@ -17,7 +17,8 @@ import {
   PieChart,
   LogOut,
   Sparkles,
-  UserPlus
+  UserPlus,
+  Tractor
 } from "lucide-react";
 
 const getLinks = (role) => {
@@ -57,6 +58,7 @@ const getLinks = (role) => {
     { name: "Village Directory", href: "/clerk/directory", icon: Users },
     { name: "Assets Ledger", href: "/clerk/assets", icon: FileSearch },
     { name: "Staff Attendance", href: "/clerk/attendance", icon: ClipboardCheck },
+    { name: "Agriculture Entry", href: "/admin/agriculture", icon: Tractor },
   ];
 
   const adminLinks = [
@@ -80,6 +82,7 @@ const getLinks = (role) => {
     { name: "Health Camps", href: "/admin/health-camps", icon: ClipboardCheck },
     { name: "Assets Ledger", href: "/admin/assets", icon: FileSearch },
     { name: "Staff Attendance", href: "/admin/attendance", icon: ClipboardCheck },
+    { name: "Agriculture Entry", href: "/admin/agriculture", icon: Tractor },
   ];
 
   const allLinks = role === "admin" ? [...adminLinks, ...common] : 

@@ -143,11 +143,10 @@ exports.getNotifications = async (req, res) => {
 exports.markNotificationRead = async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    await prisma.citizenNotification.update({
-      where: { id },
-      data: { is_read: true }
+    await prisma.citizenNotification.delete({
+      where: { id }
     });
-    res.json({ message: "Notification marked read" });
+    res.json({ message: "Notification deleted successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ detail: "Internal Server Error" });
@@ -156,11 +155,10 @@ exports.markNotificationRead = async (req, res) => {
 
 exports.markAllNotificationsRead = async (req, res) => {
   try {
-    await prisma.citizenNotification.updateMany({
-      where: { citizen_id: req.user.id, is_read: false },
-      data: { is_read: true }
+    await prisma.citizenNotification.deleteMany({
+      where: { citizen_id: req.user.id }
     });
-    res.json({ message: "All notifications marked read" });
+    res.json({ message: "All notifications deleted successfully" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ detail: "Internal Server Error" });

@@ -15,6 +15,8 @@ export default function AdminHealthCamps() {
     camp_name: "", camp_type: "Vaccination", date: "", location: "", description: "",
     timing: "", organizing_team: "", target_audience: "All Citizens", required_docs: ""
   });
+  const [activeTab, setActiveTab] = useState("upcoming");
+  const [selectedCampForRegs, setSelectedCampForRegs] = useState(null);
   const [toast, setToast] = useState({ show: false, message: "", type: "success" });
 
   const showToast = (message, type = "success") => {
@@ -102,57 +104,124 @@ export default function AdminHealthCamps() {
 
       <Card>
         <CardHeader title="All Health Camps" subtitle="Scheduled and past health initiatives" />
-        <CardContent className="space-y-4">
-          {loading ? <p className="text-center py-8 text-slate-400">Loading...</p> :
-            camps.map(camp => (
-              <div key={camp.id} className="p-6 bg-gradient-to-r from-rose-50 to-white border border-rose-100 rounded-3xl space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-rose-500/10 rounded-2xl flex items-center justify-center"><Heart className="w-6 h-6 text-rose-600" /></div>
-                    <div>
-                      <h3 className="font-bold text-slate-900">{camp.camp_name}</h3>
-                      <span className="px-2 py-0.5 bg-rose-500/10 text-rose-700 text-[10px] font-black rounded-full uppercase">{camp.camp_type}</span>
+        <CardContent className="space-y-6">
+          {/* Tab selectors */}
+          <div className="flex gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit">
+            <button
+              onClick={() => setActiveTab("upcoming")}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                activeTab === "upcoming"
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              Upcoming Camps ({camps.filter(c => new Date(c.date).setHours(0,0,0,0) >= new Date().setHours(0,0,0,0)).length})
+            </button>
+            <button
+              onClick={() => setActiveTab("past")}
+              className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                activeTab === "past"
+                  ? "bg-white text-slate-800 shadow-sm"
+                  : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              Camp History ({camps.filter(c => new Date(c.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)).length})
+            </button>
+          </div>
+
+          {loading ? (
+            <p className="text-center py-8 text-slate-400">Loading...</p>
+          ) : (
+            (() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+
+              const activeCamps = camps.filter(camp => {
+                const campDate = new Date(camp.date);
+                campDate.setHours(0, 0, 0, 0);
+                return activeTab === "upcoming" ? campDate >= today : campDate < today;
+              });
+
+              if (activeCamps.length === 0) {
+                return (
+                  <p className="text-center py-12 text-slate-400 font-semibold bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    No {activeTab === "upcoming" ? "upcoming" : "past"} health camps scheduled.
+                  </p>
+                );
+              }
+
+              return activeCamps.map(camp => (
+                <div 
+                  key={camp.id} 
+                  className={`p-6 border rounded-3xl space-y-4 transition-all ${
+                    activeTab === "past" 
+                      ? "bg-slate-50 border-slate-200/80 opacity-80" 
+                      : "bg-gradient-to-r from-rose-50 to-white border-rose-100"
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                        activeTab === "past" ? "bg-slate-200 text-slate-500" : "bg-rose-500/10 text-rose-600"
+                      }`}>
+                        <Heart className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-slate-900">{camp.camp_name}</h3>
+                        <span className={`px-2 py-0.5 text-[10px] font-black rounded-full uppercase ${
+                          activeTab === "past" ? "bg-slate-200 text-slate-600" : "bg-rose-500/10 text-rose-700"
+                        }`}>{camp.camp_type}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => setSelectedCampForRegs(camp)}
+                        className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-indigo-50/50 rounded-xl border border-slate-100 hover:border-indigo-200/50 transition-all group/btn"
+                        title="View registered citizens"
+                      >
+                        <Users className="w-4 h-4 text-indigo-500 group-hover/btn:scale-110 transition-transform" />
+                        <span className="text-sm font-black text-slate-700 group-hover/btn:text-indigo-600 transition-colors">{camp.registrations?.length || 0} registered</span>
+                      </button>
+                      <button onClick={() => setDeleteConfirmId(camp.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200 rounded-xl transition-all">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-100">
-                      <Users className="w-4 h-4 text-indigo-500" />
-                      <span className="text-sm font-black text-slate-700">{camp.registrations?.length || 0} registered</span>
+
+                  <div className={`grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4 mt-2 ${
+                    activeTab === "past" ? "border-slate-200/50" : "border-rose-100/50"
+                  }`}>
+                    <div className="p-4 bg-white rounded-2xl border border-slate-100 flex-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Organizing Team</p>
+                      <p className="text-sm font-bold text-slate-700">{camp.organizing_team || "Panchayat Medical Staff"}</p>
                     </div>
-                    <button onClick={() => setDeleteConfirmId(camp.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200 rounded-xl transition-all">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="p-4 bg-white rounded-2xl border border-slate-100 flex-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Target Audience</p>
+                      <p className="text-sm font-bold text-slate-700">{camp.target_audience || "All Citizens"}</p>
+                    </div>
+                    <div className="p-4 bg-white rounded-2xl border border-slate-100 flex-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Required Docs</p>
+                      <p className="text-sm font-bold text-slate-700">{camp.required_docs || "None"}</p>
+                    </div>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-rose-100/50 pt-4 mt-2">
-                  <div className="p-4 bg-white rounded-2xl border border-slate-100 flex-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Organizing Team</p>
-                    <p className="text-sm font-bold text-slate-700">{camp.organizing_team || "Panchayat Medical Staff"}</p>
+                  <div className="p-4 bg-white rounded-2xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Description</p>
+                    <p className="text-sm text-slate-600 font-medium">{camp.description}</p>
                   </div>
-                  <div className="p-4 bg-white rounded-2xl border border-slate-100 flex-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Target Audience</p>
-                    <p className="text-sm font-bold text-slate-700">{camp.target_audience || "All Citizens"}</p>
-                  </div>
-                  <div className="p-4 bg-white rounded-2xl border border-slate-100 flex-1">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Required Docs</p>
-                    <p className="text-sm font-bold text-slate-700">{camp.required_docs || "None"}</p>
+                  
+                  <div className="flex flex-wrap gap-4 text-xs font-bold text-slate-500">
+                    <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-blue-500" />{camp.date ? new Date(camp.date).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "TBD"}</div>
+                    <div className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-amber-500" />{camp.timing || "10:00 AM - 04:00 PM"}</div>
+                    <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-rose-500" />{camp.location}</div>
+                    {activeTab === "past" && (
+                      <span className="ml-auto px-3 py-1 bg-slate-200 text-slate-600 text-[10px] font-black rounded-full uppercase tracking-wider">Ended</span>
+                    )}
                   </div>
                 </div>
-
-                <div className="p-4 bg-white rounded-2xl border border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Description</p>
-                  <p className="text-sm text-slate-600 font-medium">{camp.description}</p>
-                </div>
-                
-                <div className="flex flex-wrap gap-4 text-xs font-bold text-slate-500">
-                  <div className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-blue-500" />{camp.date ? new Date(camp.date).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "TBD"}</div>
-                  <div className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-amber-500" />{camp.timing || "10:00 AM - 04:00 PM"}</div>
-                  <div className="flex items-center gap-1.5"><MapPin className="w-4 h-4 text-rose-500" />{camp.location}</div>
-                </div>
-              </div>
-            ))
-          }
+              ));
+            })()
+          )}
         </CardContent>
       </Card>
 
@@ -251,6 +320,48 @@ export default function AdminHealthCamps() {
           <div className="flex items-center gap-3">
             {toast.type === 'error' ? <div className="w-2 h-2 rounded-full bg-white animate-pulse" /> : <CheckCircle className="w-5 h-5 text-emerald-100" />}
             {toast.message}
+          </div>
+        </div>
+      )}
+
+      {/* Registered Citizens Modal */}
+      {selectedCampForRegs && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-indigo-500/10 rounded-2xl flex items-center justify-center">
+                  <Users className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900">Registrations</h2>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{selectedCampForRegs.camp_name}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedCampForRegs(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+              {selectedCampForRegs.registrations?.length === 0 ? (
+                <p className="text-center py-6 text-slate-400 font-medium text-sm">No citizens registered yet.</p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {selectedCampForRegs.registrations.map((reg, idx) => (
+                    <div key={reg.id || idx} className="py-3 flex items-center justify-between first:pt-0 last:pb-0">
+                      <div>
+                        <p className="text-sm font-bold text-slate-800">{reg.citizen?.full_name || "Unknown Citizen"}</p>
+                        <p className="text-xs text-slate-400 font-semibold">{reg.citizen?.mobile || "No Mobile number"}</p>
+                      </div>
+                      <span className="text-[10px] bg-slate-100 text-slate-500 font-bold px-2.5 py-1 rounded-full">
+                        ID: {reg.citizen?.id || "N/A"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

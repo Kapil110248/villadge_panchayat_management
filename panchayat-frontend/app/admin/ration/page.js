@@ -15,8 +15,8 @@ export default function AdminRation() {
     timing_description: "", 
     items_available: "",
     shop_name: "",
+    contact_number: "",
     card_type: "All Cards",
-    ward_area: "",
     ward_area: "",
     special_instructions: ""
   });
@@ -51,7 +51,7 @@ export default function AdminRation() {
       setShowModal(false);
       setFormData({ 
         distribution_date: "", timing_description: "", items_available: "",
-        shop_name: "", card_type: "All Cards", ward_area: "", special_instructions: "" 
+        shop_name: "", contact_number: "", card_type: "All Cards", ward_area: "", special_instructions: "" 
       });
       showToast("Ration schedule added successfully!");
     } catch (e) {
@@ -129,6 +129,9 @@ export default function AdminRation() {
                   <div className="p-4 bg-white rounded-2xl border border-slate-100 flex-1">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ration Shop (Kotedar)</p>
                     <p className="text-sm font-bold text-slate-700">{s.shop_name || "Any Designated Shop"}</p>
+                    {s.contact_number && (
+                      <p className="text-xs text-slate-500 font-semibold mt-1">📞 {s.contact_number}</p>
+                    )}
                   </div>
                   <div className="p-4 bg-white rounded-2xl border border-slate-100 flex-1">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Card Eligibility</p>
@@ -187,6 +190,13 @@ export default function AdminRation() {
                   <input type="text" placeholder="e.g. Ramu Kotedar, Shop 1" value={formData.shop_name} onChange={e => setFormData({...formData, shop_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
                 </div>
                 <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dealer Contact No.</label>
+                  <input type="tel" placeholder="e.g. 9876543210" value={formData.contact_number} onChange={e => setFormData({...formData, contact_number: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Card Eligibility</label>
                   <select value={formData.card_type} onChange={e => setFormData({...formData, card_type: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all">
                     <option value="All Cards">All Cards</option>
@@ -195,11 +205,10 @@ export default function AdminRation() {
                     <option value="APL Only">APL Only</option>
                   </select>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ward / Area (Optional)</label>
-                <input type="text" placeholder="e.g. Ward 1 to 5" value={formData.ward_area} onChange={e => setFormData({...formData, ward_area: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ward / Area (Optional)</label>
+                  <input type="text" placeholder="e.g. Ward 1 to 5" value={formData.ward_area} onChange={e => setFormData({...formData, ward_area: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                </div>
               </div>
 
               <div className="space-y-2">
