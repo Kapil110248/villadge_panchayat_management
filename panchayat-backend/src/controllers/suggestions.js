@@ -36,7 +36,7 @@ exports.createSuggestion = async (req, res) => {
 
 exports.voteSuggestion = async (req, res) => {
   try {
-    const vote = await prisma.suggestionVote.create({ data: { suggestion_id: parseInt(req.params.id), citizen_id: req.user.id } });
+    const vote = await prisma.suggestionVote.create({ data: { suggestion_id: req.params.id, citizen_id: req.user.id } });
     res.json({ message: "Suggestion upvoted!", vote });
   } catch (error) { res.status(400).json({ detail: "You have already upvoted this suggestion" }); }
 };
@@ -48,7 +48,7 @@ exports.updateSuggestionStatus = async (req, res) => {
     const valid_statuses = ["pending", "under_consideration", "accepted", "rejected"];
     if (!valid_statuses.includes(data.status)) return res.status(400).json({ detail: "Invalid status" });
     const sugg = await prisma.userSuggestion.update({ 
-      where: { id: parseInt(req.params.id) }, 
+      where: { id: req.params.id }, 
       data: { status: data.status, processed_by_id: req.user.id } 
     });
     res.json({ message: `Suggestion marked as ${data.status}`, suggestion: sugg });
@@ -58,7 +58,7 @@ exports.updateSuggestionStatus = async (req, res) => {
 exports.deleteSuggestion = async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ detail: "Access denied" });
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     await prisma.suggestionVote.deleteMany({ where: { suggestion_id: id } });
     await prisma.userSuggestion.delete({ where: { id } });
     res.json({ message: "Suggestion deleted successfully" });

@@ -87,7 +87,7 @@ exports.createProject = async (req, res) => {
 exports.updateProject = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    const project_id = parseInt(req.params.project_id);
+    const project_id = req.params.project_id;
     const data = req.body;
     const project = await prisma.developmentProject.update({ 
       where: { id: project_id }, 

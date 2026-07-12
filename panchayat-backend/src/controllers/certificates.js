@@ -4,8 +4,12 @@ const { v4: uuidv4 } = require('uuid');
 exports.getCertificates = async (req, res) => {
   try {
     if (['admin', 'clerk'].includes(req.user.role)) {
-      const certs = await prisma.certificate.findMany({ include: { citizen: true }, orderBy: { submitted_at: 'desc' } });
-      res.json(certs);
+      const certs = await prisma.certificate.findMany({ include: { user_certificate_citizen_idTouser: true }, orderBy: { submitted_at: 'desc' } });
+      const mapped = certs.map(c => {
+        const { user_certificate_citizen_idTouser, ...rest } = c;
+        return { ...rest, citizen: user_certificate_citizen_idTouser };
+      });
+      res.json(mapped);
     } else {
       const certs = await prisma.certificate.findMany({ where: { citizen_id: req.user.id }, orderBy: { submitted_at: 'desc' } });
       res.json(certs);
@@ -26,7 +30,7 @@ exports.applyCertificate = async (req, res) => {
 exports.verifyCertificate = async (req, res) => {
   if (req.user.role !== "clerk") return res.status(403).json({ detail: "Only Clerk can verify documents" });
   try {
-    const cert_id = parseInt(req.params.cert_id);
+    const cert_id = req.params.cert_id;
     const remarks = req.body.remarks || req.query.remarks || "";
     const cert = await prisma.certificate.update({ where: { id: cert_id }, data: { processed_by_id: req.user.id, remarks: `Clerk Verified: ${remarks}`, processed_at: new Date() }, include: { citizen: true } });
     
@@ -48,7 +52,7 @@ exports.verifyCertificate = async (req, res) => {
 exports.approveCertificate = async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ detail: "Only Admin can sign and approve certificates" });
   try {
-    const cert_id = parseInt(req.params.cert_id);
+    const cert_id = req.params.cert_id;
     const remarks = req.body.remarks || req.query.remarks || "";
     const certificate_url = req.body.certificate_url; // Optional uploaded file
     const existing = await prisma.certificate.findUnique({ where: { id: cert_id } });
@@ -62,7 +66,7 @@ exports.approveCertificate = async (req, res) => {
 exports.issueCertificateDirectly = async (req, res) => {
   if (req.user.role !== "clerk") return res.status(403).json({ detail: "Only Clerk can issue certificates directly" });
   try {
-    const cert_id = parseInt(req.params.cert_id);
+    const cert_id = req.params.cert_id;
     const { remarks, certificate_url } = req.body;
     if (!certificate_url) return res.status(400).json({ detail: "Certificate document is required for direct issuance" });
     
@@ -89,7 +93,7 @@ exports.issueCertificateDirectly = async (req, res) => {
 exports.rejectCertificate = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Only Admin or Clerk can reject certificates" });
   try {
-    const cert_id = parseInt(req.params.cert_id);
+    const cert_id = req.params.cert_id;
     const remarks = req.body.remarks || req.query.remarks || "";
     const existing = await prisma.certificate.findUnique({ where: { id: cert_id } });
     if (!existing) return res.status(404).json({ detail: "Certificate not found" });
@@ -109,7 +113,7 @@ exports.verifyCertificatePublic = async (req, res) => {
 
 exports.deleteCertificate = async (req, res) => {
   try {
-    const cert_id = parseInt(req.params.cert_id);
+    const cert_id = req.params.cert_id;
     const existing = await prisma.certificate.findUnique({ where: { id: cert_id } });
     
     if (!existing) return res.status(404).json({ detail: "Certificate not found" });

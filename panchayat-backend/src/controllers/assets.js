@@ -19,7 +19,7 @@ exports.createAsset = async (req, res) => {
 exports.deleteAsset = async (req, res) => {
   if (req.user.role !== "admin") return res.status(403).json({ detail: "Access denied" });
   try {
-    await prisma.villageAsset.delete({ where: { id: parseInt(req.params.id) } });
+    await prisma.villageAsset.delete({ where: { id: req.params.id } });
     res.json({ message: "Asset deleted successfully" });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };

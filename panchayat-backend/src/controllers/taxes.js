@@ -51,7 +51,7 @@ exports.payTax = async (req, res) => {
 exports.approveTax = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    const tax = await prisma.taxRecord.update({ where: { id: parseInt(req.params.tax_id) }, data: { status: "paid" } });
+    const tax = await prisma.taxRecord.update({ where: { id: req.params.tax_id }, data: { status: "paid" } });
     res.json({ message: "Payment approved successfully", tax });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };
@@ -60,12 +60,12 @@ exports.levyTax = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
     const data = req.body;
-    const tax = await prisma.taxRecord.create({ data: { citizen_id: parseInt(data.citizen_id), tax_type: data.tax_type, amount: parseFloat(data.amount), due_date: new Date(data.due_date), status: "unpaid", penalty_rate: data.penalty_rate ? parseFloat(data.penalty_rate) : 0.0 } });
+    const tax = await prisma.taxRecord.create({ data: { citizen_id: data.citizen_id, tax_type: data.tax_type, amount: parseFloat(data.amount), due_date: new Date(data.due_date), status: "unpaid", penalty_rate: data.penalty_rate ? parseFloat(data.penalty_rate) : 0.0 } });
     
     // Create Citizen notification
     await prisma.citizenNotification.create({
       data: {
-        citizen_id: parseInt(data.citizen_id),
+        citizen_id: data.citizen_id,
         title: "New Tax Levied",
         message: `A new ${data.tax_type} tax of ₹${parseFloat(data.amount)} has been levied. Due Date: ${new Date(data.due_date).toLocaleDateString("en-IN")}. Penalty: ${data.penalty_rate || 0}%/month if unpaid.`,
         type: "tax",

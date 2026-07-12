@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-import { Lock, Mail, Shield, User as UserIcon, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, Shield, User as UserIcon, ArrowRight, Eye, EyeOff, X } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function LoginPage() {
@@ -13,7 +13,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState("citizen");
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: "", type: "error" });
   const router = useRouter();
+
+  const showToast = (message, type = "error") => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: "", type: "error" }), 3500);
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -39,7 +45,7 @@ export default function LoginPage() {
         router.push("/citizen/dashboard");
       } catch (error) {
         console.error("Login failed:", error);
-        alert(error.message || "Invalid credentials or account not approved.");
+        showToast(error.message || "Invalid credentials or account not approved.");
         setLoading(false);
       }
     } else {
@@ -63,7 +69,7 @@ export default function LoginPage() {
         else if (role === "clerk") router.push("/clerk/dashboard");
       } catch (error) {
         console.error("Login failed:", error);
-        alert(error.message || "Invalid credentials.");
+        showToast(error.message || "Invalid credentials.");
         setLoading(false);
       }
     }
@@ -71,6 +77,14 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 overflow-hidden bg-slate-50">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-[60] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 transition-all animate-in slide-in-from-top-4 fade-in ${toast.type === "success" ? "bg-emerald-600 text-white" : "bg-rose-600 text-white"}`}>
+           {toast.type === "success" ? <Shield className="w-5 h-5" /> : <X className="w-5 h-5" />}
+           <p className="font-bold text-sm">{toast.message}</p>
+        </div>
+      )}
+
       {/* Background Decorative Elements - FIXED: added pointer-events-none */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-pulse pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] animate-pulse pointer-events-none" />

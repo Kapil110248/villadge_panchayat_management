@@ -142,7 +142,7 @@ exports.getNotifications = async (req, res) => {
 
 exports.markNotificationRead = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     await prisma.citizenNotification.delete({
       where: { id }
     });
@@ -167,7 +167,7 @@ exports.markAllNotificationsRead = async (req, res) => {
 
 exports.confirmComplaintResolution = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     await prisma.complaint.update({
       where: { id },
       data: { 
@@ -255,7 +255,7 @@ exports.getMyApplications = async (req, res) => {
 
 exports.approveSchemeApplication = async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     
     // Check if it belongs to this citizen
     const app = await prisma.schemeApplication.findFirst({
@@ -559,7 +559,7 @@ exports.addFamilyMember = async (req, res) => {
 exports.updateFamilyMember = async (req, res) => {
   try {
     const headId = req.user.id;
-    const memberId = parseInt(req.params.id);
+    const memberId = req.params.id;
     const { full_name, email, mobile, dob, gender, relation, avatar_url } = req.body;
 
     const family = await prisma.family.findUnique({
@@ -655,7 +655,7 @@ const writeVaultDocs = (data) => {
 
 exports.getVaultDocuments = async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = req.params.userId;
     const allDocs = readVaultDocs();
     const userDocs = allDocs[userId] || [];
     res.json(userDocs);

@@ -8,7 +8,7 @@ exports.getNotifications = async (req, res) => {
       orderBy: { created_at: 'desc' }, 
       take: 20,
       include: {
-        sender: {
+        user: {
           select: {
             full_name: true,
             avatar_url: true,
@@ -17,15 +17,19 @@ exports.getNotifications = async (req, res) => {
         }
       }
     });
+    const mappedNotifications = notifications.map(notif => {
+      const { user, ...rest } = notif;
+      return { ...rest, sender: user };
+    });
     const unread_count = await prisma.adminNotification.count({ where: { is_read: false, sender_id: { not: req.user.id } } });
-    res.json({ notifications, unread_count });
+    res.json({ notifications: mappedNotifications, unread_count });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };
 
 exports.readNotification = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    await prisma.adminNotification.delete({ where: { id: parseInt(req.params.id) } });
+    await prisma.adminNotification.delete({ where: { id: req.params.id } });
     res.json({ message: "Notification deleted successfully" });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };

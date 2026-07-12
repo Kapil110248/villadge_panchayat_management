@@ -1,4 +1,19 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+// ============================================================
+// API Configuration — Centralized Backend URL
+// ============================================================
+// To switch between LIVE and LOCAL, change NEXT_PUBLIC_API_URL
+// in your .env.local file (frontend root directory):
+//
+//   LIVE  → NEXT_PUBLIC_API_URL=https://panchayat-backend-0aqf.onrender.com/api
+//   LOCAL → NEXT_PUBLIC_API_URL=http://localhost:8001/api
+//
+// If .env.local is not set, it defaults to the LIVE Render server.
+// ============================================================
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8001/api";
+
 
 export const api = {
   // Helper for GET requests

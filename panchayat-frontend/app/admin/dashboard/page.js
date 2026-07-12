@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { 
   BarChart3, 
   Users, 
@@ -17,30 +17,51 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { api } from "@/lib/api";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
 
 export default function AdminDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("Adhikari");
+  const router = useRouter();
 
   const handleExport = () => {
     if (!dashboardData) return;
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + "Metric,Value\n"
-      + `Total Citizens,${dashboardData.stats.total_citizens}\n`
-      + `Pending Approvals,${dashboardData.stats.pending_approvals}\n`
-      + `Open Complaints,${dashboardData.stats.open_complaints}\n`
-      + `Total Certificates,${dashboardData.stats.total_certificates}\n`
-      + `Complaint Resolution %,${dashboardData.health.complaint_resolve_pct}\n`
-      + `Scheme Utilization %,${dashboardData.health.scheme_util_pct}\n`;
+    const doc = new jsPDF();
     
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "panchayat_analytics.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Add Title
+    doc.setFontSize(20);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.text("Panchayat Dashboard Analytics", 14, 22);
+    
+    // Add Subtitle
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 30);
+
+    // Table Data
+    const tableColumn = ["Metric", "Value", "Status"];
+    const tableRows = [
+      ["Total Citizens", dashboardData.stats.total_citizens.toString(), "Active"],
+      ["Pending Approvals", dashboardData.stats.pending_approvals.toString(), dashboardData.stats.pending_approvals > 0 ? "Action Needed" : "Clear"],
+      ["Open Complaints", dashboardData.stats.open_complaints.toString(), dashboardData.stats.open_complaints > 5 ? "High" : "Normal"],
+      ["Total Certificates", dashboardData.stats.total_certificates.toString(), "Issued"],
+      ["Complaint Resolution", `${dashboardData.health.complaint_resolve_pct}%`, "Health Score"],
+      ["Scheme Utilization", `${dashboardData.health.scheme_util_pct}%`, "Health Score"]
+    ];
+
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 40,
+      theme: 'grid',
+      headStyles: { fillColor: [16, 185, 129] }, // emerald-500
+      styles: { fontSize: 11, cellPadding: 6 },
+      alternateRowStyles: { fillColor: [248, 250, 252] } // slate-50
+    });
+
+    doc.save("panchayat_analytics.pdf");
   };
 
   useEffect(() => {
@@ -117,31 +138,29 @@ export default function AdminDashboard() {
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest">
              <ShieldCheck className="w-3 h-3" /> System Administrator
           </div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">{userName} Ji, <br /> <span className="text-primary italic">Aapka Swagat Hai.</span></h1>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">{userName} Ji, <br /> <span className="text-primary italic">Aapka Swagat Hai.</span></h1>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button variant="secondary" className="rounded-2xl border-slate-200" onClick={handleExport}>Export Analytics</Button>
-          <Link href="/admin/notices">
-            <Button className="bg-slate-900 shadow-2xl shadow-slate-300">
-               <Plus className="w-5 h-5 mr-2" /> Global Notice
-            </Button>
-          </Link>
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto mt-4 lg:mt-0">
+          <Button variant="secondary" className="rounded-2xl border-slate-200 w-full sm:w-auto font-bold shadow-sm" onClick={handleExport}>Export PDF</Button>
+          <Button onClick={() => router.push('/admin/notices')} className="bg-slate-900 shadow-xl shadow-slate-900/20 hover:shadow-slate-900/40 hover:-translate-y-0.5 transition-all w-full sm:w-auto rounded-2xl">
+             <Plus className="w-5 h-5 mr-2" /> Global Notice
+          </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {stats.map((stat) => (
-          <Card key={stat.label} className="p-8 group">
-             <div className="flex justify-between items-start mb-6">
-                <div className={`${stat.bg} ${stat.color} w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                   <stat.icon className="w-6 h-6" />
+          <Card key={stat.label} className="p-4 sm:p-8 group hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+             <div className="flex justify-between items-start mb-4 sm:mb-6">
+                <div className={`${stat.bg} ${stat.color} w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform shrink-0`}>
+                   <stat.icon className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-widest ${stat.trend === "up" ? "text-emerald-500" : "text-rose-500"}`}>
-                   {stat.change} {stat.trend === "up" ? <ArrowUpRight className="w-3 h-3 text-emerald-400" /> : <ArrowDownRight className="w-3 h-3 text-rose-400" />}
+                <div className={`flex items-center gap-1 text-[8px] sm:text-[10px] font-black uppercase tracking-widest ${stat.trend === "up" ? "text-emerald-500" : "text-rose-500"}`}>
+                   <span className="hidden sm:inline">{stat.change}</span> {stat.trend === "up" ? <ArrowUpRight className="w-3 h-3 sm:w-3 sm:h-3 text-emerald-400" /> : <ArrowDownRight className="w-3 h-3 sm:w-3 sm:h-3 text-rose-400" />}
                 </div>
              </div>
-             <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{stat.label}</p>
-             <h3 className={`text-3xl font-black text-slate-900 ${loading ? "animate-pulse" : ""}`}>{stat.value}</h3>
+             <p className="text-[9px] sm:text-xs font-black text-slate-400 uppercase tracking-widest mb-1 truncate">{stat.label}</p>
+             <h3 className={`text-xl sm:text-3xl font-black text-slate-900 ${loading ? "animate-pulse" : ""}`}>{stat.value}</h3>
           </Card>
         ))}
       </div>
@@ -161,12 +180,12 @@ export default function AdminDashboard() {
                 </h4>
                 {dashboardData?.recent_registrations?.length > 0 ? (
                   dashboardData.recent_registrations.map((req) => (
-                    <div key={req.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-primary/30 transition-colors">
-                      <div>
-                        <p className="font-bold text-sm text-slate-900">{req.full_name}</p>
+                    <div key={req.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-primary/30 transition-colors gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-sm text-slate-900 truncate">{req.full_name}</p>
                         <p className="text-xs text-slate-500">{new Date(req.submitted_at).toLocaleDateString()}</p>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider ${req.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <span className={`self-start sm:self-auto text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider shrink-0 ${req.status === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
                         {req.status}
                       </span>
                     </div>
@@ -183,12 +202,12 @@ export default function AdminDashboard() {
                 </h4>
                 {dashboardData?.recent_complaints?.length > 0 ? (
                   dashboardData.recent_complaints.map((comp) => (
-                    <div key={comp.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-primary/30 transition-colors">
-                      <div>
-                        <p className="font-bold text-sm text-slate-900 truncate max-w-[150px]">{comp.subject}</p>
+                    <div key={comp.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-primary/30 transition-colors gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-sm text-slate-900 truncate">{comp.subject}</p>
                         <p className="text-xs text-slate-500 capitalize">{comp.complaint_type}</p>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider ${comp.status === 'open' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span className={`self-start sm:self-auto text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider shrink-0 ${comp.status === 'open' ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700'}`}>
                         {comp.status}
                       </span>
                     </div>
@@ -228,8 +247,8 @@ export default function AdminDashboard() {
             </div>
 
             <div className="pt-6 border-t border-white/10">
-               <div className="flex items-center gap-4 p-5 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 hover:bg-white/15 transition-all">
-                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-700 shadow-xl">
+               <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 hover:bg-white/15 transition-all">
+                  <div className="w-12 h-12 shrink-0 bg-white rounded-2xl flex items-center justify-center text-emerald-700 shadow-xl">
                      <Target className="w-6 h-6" />
                   </div>
                   <div>

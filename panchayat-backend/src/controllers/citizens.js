@@ -27,7 +27,7 @@ exports.createCitizen = async (req, res) => {
 exports.updateCitizen = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const data = req.body;
     const user = await prisma.user.findUnique({ where: { id }, include: { profile: true } });
     if (!user) return res.status(404).json({ detail: "Citizen not found" });
@@ -54,7 +54,7 @@ exports.updateCitizen = async (req, res) => {
 exports.deleteCitizen = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    const id = parseInt(req.params.id);
+    const id = req.params.id;
     const user = await prisma.user.findUnique({ where: { id }, include: { profile: true } });
     if (user && user.profile) { await prisma.citizenProfile.delete({ where: { id: user.profile.id } }); }
     await prisma.user.delete({ where: { id } });

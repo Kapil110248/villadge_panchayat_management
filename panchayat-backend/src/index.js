@@ -5,16 +5,29 @@ const { prisma } = require('./db');
 
 const app = express();
 
-const origins = [
+const allowedOrigins = [
   "http://localhost:3000",
-  "http://127.0.0.1:3000"
+  "http://localhost:3001",
+  "http://127.0.0.1:3000",
+  "https://panchayat-frontend-xi.vercel.app"
 ];
 
 app.use(cors({
-  origin: origins,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, curl, etc.)
+    if (!origin) return callback(null, true);
+    // Allow if origin is in our list OR is a Vercel preview deployment
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app')
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['*']
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());

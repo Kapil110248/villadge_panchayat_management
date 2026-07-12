@@ -33,7 +33,7 @@ exports.deleteScheme = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
     await prisma.agriScheme.delete({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     res.json({ message: "Agriculture scheme deleted successfully" });
   } catch (error) {
@@ -65,7 +65,7 @@ exports.deleteAdvisory = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
     await prisma.seasonalAdvisory.delete({
-      where: { id: parseInt(req.params.id) }
+      where: { id: req.params.id }
     });
     res.json({ message: "Seasonal advisory deleted successfully" });
   } catch (error) {
@@ -78,12 +78,15 @@ exports.getCropInfo = async (req, res) => {
   const query = req.query.query || 'wheat';
   try {
     // Attempt to fetch from Wikipedia API
-    const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
-    const wikiRes = await fetch(wikiUrl);
-    
     let wikiData = null;
-    if (wikiRes.ok) {
-      wikiData = await wikiRes.json();
+    try {
+      const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
+      const wikiRes = await fetch(wikiUrl);
+      if (wikiRes.ok) {
+        wikiData = await wikiRes.json();
+      }
+    } catch (e) {
+      console.warn("Wikipedia EN fetch failed:", e.message);
     }
 
     // Attempt Hindi Wikipedia if available
@@ -148,6 +151,66 @@ exports.getCropInfo = async (req, res) => {
         pests: "Pink Bollworm (गुलाबी सूंडी), Whitefly",
         yield: "10 - 12 quintals per acre"
       });
+    } else if (normalized.includes("soyabean") || normalized.includes("soybean") || normalized.includes("सोयाबीन")) {
+      Object.assign(defaults, {
+        soil: "Well-drained fertile loamy to clayey soil (काली या दोमट मिट्टी)",
+        temp: "20°C - 35°C",
+        seeds: "30 - 35 kg per acre",
+        watering: "Moderate irrigation; critical during flowering and pod development",
+        fertilizer: "NPK (20:60:40 kg/ha) + Sulphur",
+        pests: "Girdle Beetle (गर्डल बीटल), Tobacco Caterpillar",
+        yield: "8 - 12 quintals per acre"
+      });
+    } else if (normalized.includes("garlic") || normalized.includes("लहसुन")) {
+      Object.assign(defaults, {
+        soil: "Rich loamy or sandy loam with good drainage (दोमट या बलुई दोमट)",
+        temp: "15°C - 25°C",
+        seeds: "200 - 250 kg cloves per acre",
+        watering: "Regular irrigation every 10-15 days during growing season",
+        fertilizer: "NPK (100:50:50 kg/ha) + Organic Manure",
+        pests: "Thrips (थ्रिप्स), Purple Blotch",
+        yield: "40 - 50 quintals per acre"
+      });
+    } else if (normalized.includes("maize") || normalized.includes("मक्का")) {
+      Object.assign(defaults, {
+        soil: "Deep, fertile and well-drained loamy soil (दोमट या जलोढ़ मिट्टी)",
+        temp: "21°C - 30°C",
+        seeds: "8 - 10 kg per acre",
+        watering: "Moderate. Critical stages: Tasseling & Silking",
+        fertilizer: "NPK (120:60:40 kg/ha) split in 3 stages",
+        pests: "Fall Armyworm (फॉ आर्मीवर्म), Stem Borer",
+        yield: "15 - 25 quintals per acre"
+      });
+    } else if (normalized.includes("tomato") || normalized.includes("टमाटर")) {
+      Object.assign(defaults, {
+        soil: "Well-drained sandy loam to clay loam (बलुई दोमट या दोमट)",
+        temp: "20°C - 28°C",
+        seeds: "100 - 150 grams per acre (Transplanted)",
+        watering: "Weekly irrigation in winter, 3-4 days in summer",
+        fertilizer: "NPK (100:80:60 kg/ha) + micronutrients",
+        pests: "Fruit Borer (फल छेदक), Early Blight",
+        yield: "150 - 200 quintals per acre"
+      });
+    } else if (normalized.includes("onion") || normalized.includes("प्याज")) {
+      Object.assign(defaults, {
+        soil: "Sandy loam to clay loam with good drainage (बलुई दोमट)",
+        temp: "15°C - 25°C",
+        seeds: "3 - 4 kg per acre (Transplanted)",
+        watering: "10 - 12 irrigations depending on soil and climate",
+        fertilizer: "NPK (120:50:80 kg/ha) + Sulphur",
+        pests: "Thrips (थ्रिप्स), Purple Blotch",
+        yield: "100 - 120 quintals per acre"
+      });
+    } else if (normalized.includes("coriander") || normalized.includes("धनिया")) {
+      Object.assign(defaults, {
+        soil: "Well-drained loamy soil (दोमट या बलुई दोमट)",
+        temp: "15°C - 25°C",
+        seeds: "10 - 12 kg per acre",
+        watering: "Low to Moderate; 4-5 irrigations are sufficient",
+        fertilizer: "NPK (60:40:20 kg/ha)",
+        pests: "Powdery Mildew (चूर्णिल आसिता), Aphids",
+        yield: "6 - 8 quintals per acre"
+      });
     }
 
     res.json({
@@ -178,8 +241,36 @@ exports.getMandiRates = async (req, res) => {
       { state: "Madhya Pradesh", district: "Neemuch", market: "Neemuch Mandi", crop: "Mustard (सरसों)", variety: "Mustard Seeds", grade: "FAQ", baseMin: 5100, baseMax: 5600 },
       { state: "Madhya Pradesh", district: "Neemuch", market: "Neemuch Mandi", crop: "Garlic (लहसुन)", variety: "Deshi", grade: "FAQ", baseMin: 7000, baseMax: 11000 },
       { state: "Madhya Pradesh", district: "Neemuch", market: "Neemuch Mandi", crop: "Coriander (धनिया)", variety: "Green Clean", grade: "FAQ", baseMin: 6200, baseMax: 7800 },
-      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Mustard (सरसों)", variety: "Mustard Seeds", grade: "FAQ", baseMin: 5200, baseMax: 5750 },
+      
+      // Mandsaur District Mandis (Crops, Vegetables, Fruits)
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Soyabean (सोयाबीन)", variety: "Yellow", grade: "FAQ", baseMin: 4200, baseMax: 4650 },
       { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Garlic (लहसुन)", variety: "G2", grade: "Grade A", baseMin: 8000, baseMax: 13000 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Garlic (लहसुन)", variety: "Deshi", grade: "FAQ", baseMin: 6500, baseMax: 10500 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Wheat (गेहूँ)", variety: "Lokwan", grade: "FAQ", baseMin: 2350, baseMax: 2650 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Maize (मक्का)", variety: "Yellow", grade: "FAQ", baseMin: 1850, baseMax: 2150 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Mustard (सरसों)", variety: "Mustard Seeds", grade: "FAQ", baseMin: 5200, baseMax: 5750 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Coriander (धनिया)", variety: "Badami", grade: "FAQ", baseMin: 5800, baseMax: 7200 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Fenugreek (मेथी)", variety: "Methi Seeds", grade: "FAQ", baseMin: 5500, baseMax: 6800 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Onion (प्याज)", variety: "Red", grade: "FAQ", baseMin: 1400, baseMax: 2200 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Tomato (टमाटर)", variety: "Local", grade: "FAQ", baseMin: 1000, baseMax: 1800 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Green Peas (मटर)", variety: "Local", grade: "FAQ", baseMin: 2500, baseMax: 3500 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Orange (संतरा)", variety: "Local", grade: "FAQ", baseMin: 3000, baseMax: 5000 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Mandsaur Mandi", crop: "Pomegranate (अनार)", variety: "Kabul", grade: "Grade A", baseMin: 6000, baseMax: 9500 },
+
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Malhargarh Mandi", crop: "Soyabean (सोयाबीन)", variety: "Yellow", grade: "FAQ", baseMin: 4150, baseMax: 4550 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Malhargarh Mandi", crop: "Wheat (गेहूँ)", variety: "Lokwan", grade: "FAQ", baseMin: 2300, baseMax: 2600 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Malhargarh Mandi", crop: "Garlic (लहसुन)", variety: "Deshi", grade: "FAQ", baseMin: 6200, baseMax: 10000 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Malhargarh Mandi", crop: "Maize (मक्का)", variety: "Yellow", grade: "FAQ", baseMin: 1800, baseMax: 2100 },
+
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Sitamau Mandi", crop: "Soyabean (सोयाबीन)", variety: "Yellow", grade: "FAQ", baseMin: 4180, baseMax: 4600 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Sitamau Mandi", crop: "Wheat (गेहूँ)", variety: "Lokwan", grade: "FAQ", baseMin: 2320, baseMax: 2620 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Sitamau Mandi", crop: "Garlic (लहसुन)", variety: "Deshi", grade: "FAQ", baseMin: 6300, baseMax: 10200 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Sitamau Mandi", crop: "Mustard (सरसों)", variety: "Mustard Seeds", grade: "FAQ", baseMin: 5150, baseMax: 5700 },
+
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Piplia Mandi", crop: "Soyabean (सोयाबीन)", variety: "Yellow", grade: "FAQ", baseMin: 4220, baseMax: 4670 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Piplia Mandi", crop: "Wheat (गेहूँ)", variety: "Lokwan", grade: "FAQ", baseMin: 2360, baseMax: 2660 },
+      { state: "Madhya Pradesh", district: "Mandsaur", market: "Piplia Mandi", crop: "Garlic (लहसुन)", variety: "Deshi", grade: "FAQ", baseMin: 6600, baseMax: 10800 },
+      
       { state: "Madhya Pradesh", district: "Dewas", market: "Sarahi Local Mandi", crop: "Wheat (गेहूँ)", variety: "Lokwan", grade: "FAQ", baseMin: 2200, baseMax: 2450 },
       { state: "Madhya Pradesh", district: "Dewas", market: "Sarahi Local Mandi", crop: "Paddy (धान)", variety: "Kranti", grade: "FAQ", baseMin: 1850, baseMax: 2100 },
       { state: "Madhya Pradesh", district: "Dewas", market: "Sarahi Local Mandi", crop: "Potato (आलू)", variety: "Jyoti", grade: "FAQ", baseMin: 1200, baseMax: 1600 },

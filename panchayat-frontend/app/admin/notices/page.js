@@ -24,6 +24,8 @@ export default function NoticeManagement() {
   const [editMode, setEditMode] = useState(false);
   const [editId, setEditId] = useState(null);
   const [viewNotice, setViewNotice] = useState(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchNotices = async () => {
     try {
@@ -130,15 +132,23 @@ export default function NoticeManagement() {
     setFormData({ title: "", content: "", target_audience: "All Villagers", action_required: "", valid_until: "", notice_type: "update" });
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm("Are you sure you want to delete this notice?")) return;
+  const handleDelete = (id) => {
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmId) return;
+    setIsDeleting(true);
     try {
       const token = localStorage.getItem("accessToken");
-      await api.delete(`/admin/notices/${id}`, token);
+      await api.delete(`/admin/notices/${deleteConfirmId}`, token);
       showToast("Notice deleted.");
       fetchNotices();
     } catch (err) {
       showToast("Error deleting: " + err.message, "error");
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmId(null);
     }
   };
 
@@ -152,19 +162,56 @@ export default function NoticeManagement() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <Card className="w-full max-w-sm p-6 relative shadow-2xl border-0 bg-white rounded-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+                <Trash className="w-6 h-6" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Delete Notice?</h2>
+              <p className="text-slate-500 text-sm mb-6">
+                Are you sure you want to delete this notice? This action cannot be undone.
+              </p>
+              <div className="flex items-center gap-3 w-full">
+                <Button 
+                  type="button"
+                  variant="outline"
+                  className="flex-1 bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700" 
+                  onClick={() => setDeleteConfirmId(null)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="button" 
+                  className="flex-1 bg-rose-500 hover:bg-rose-600 text-white border-0" 
+                  onClick={confirmDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Add Notice Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <Card className="w-full max-w-2xl p-6 relative shadow-2xl border-0 my-8">
-            <button onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-2xl p-6 relative shadow-2xl border-0 max-h-[90vh] flex flex-col">
+            <button onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all z-10">
               <X className="w-4 h-4" />
             </button>
-            <div className="mb-6">
-              <h2 className="text-2xl font-black text-slate-900">Nayi Notice Banayein</h2>
+            <div className="mb-6 shrink-0 pr-8">
+              <h2 className="text-2xl font-black text-slate-900">{editMode ? "Notice Update Karein" : "Nayi Notice Banayein"}</h2>
               <p className="text-sm font-medium text-slate-500">Village ke liye ek detailed aur logical notice publish karein</p>
             </div>
-            <form onSubmit={handleAddOrEditNotice} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="overflow-y-auto -mx-2 px-2 pb-2">
+              <form onSubmit={handleAddOrEditNotice} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Title *</label>
                   <input required type="text" className="w-full mt-1 p-3.5 bg-slate-50 border-2 border-transparent focus:border-primary/20 focus:bg-white rounded-xl text-sm font-semibold transition-all outline-none" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} placeholder="e.g. Gram Sabha Meeting" />
@@ -209,19 +256,20 @@ export default function NoticeManagement() {
               <Button type="submit" className="w-full mt-6 py-6 rounded-xl text-lg font-bold shadow-xl shadow-primary/20" disabled={adding}>
                 {adding ? "Publishing to Database..." : "Save Broadcast Notice"}
               </Button>
-            </form>
+              </form>
+            </div>
           </Card>
         </div>
       )}
 
       {/* View Notice Modal */}
       {viewNotice && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto">
-          <Card className="w-full max-w-2xl p-6 relative shadow-2xl border-0 my-8">
-            <button onClick={() => setViewNotice(null)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-2xl p-6 relative shadow-2xl border-0 max-h-[90vh] flex flex-col">
+            <button onClick={() => setViewNotice(null)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all z-10">
               <X className="w-4 h-4" />
             </button>
-            <div className="mb-6 border-b border-slate-100 pb-4">
+            <div className="mb-6 border-b border-slate-100 pb-4 shrink-0 pr-8">
               <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest mb-3 inline-block ${
                  viewNotice.notice_type === 'important' ? 'bg-rose-100 text-rose-700' : viewNotice.notice_type === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
               }`}>
@@ -230,19 +278,19 @@ export default function NoticeManagement() {
               <h2 className="text-2xl font-black text-slate-900">{viewNotice.title}</h2>
               <p className="text-xs font-bold text-slate-400 mt-2">Published by {viewNotice.created_by} on {viewNotice.created_at}</p>
             </div>
-            <div className="space-y-6 text-slate-700 whitespace-pre-wrap leading-relaxed text-sm">
+            <div className="space-y-6 text-slate-700 whitespace-pre-wrap leading-relaxed text-sm overflow-y-auto -mx-2 px-2 pb-2">
               {viewNotice.content}
             </div>
           </Card>
         </div>
       )}
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Notice Management</h1>
-          <p className="text-slate-500">Create and broadcast village-wide announcements</p>
+          <p className="text-sm text-slate-500">Create and broadcast village-wide announcements</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}><Plus className="w-4 h-4 mr-2" /> Nayi Notice Banayein</Button>
+        <Button onClick={() => setShowAddModal(true)} className="w-full sm:w-auto shadow-xl shadow-slate-900/20"><Plus className="w-4 h-4 mr-2" /> Nayi Notice Banayein</Button>
       </div>
 
       {loading ? (

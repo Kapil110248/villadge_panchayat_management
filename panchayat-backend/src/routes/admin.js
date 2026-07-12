@@ -13,6 +13,10 @@ router.post('/registration-requests/:id/approve', adminController.approveRegistr
 router.post('/registration-requests/:id/reject', adminController.rejectRegistrationRequest);
 router.get('/clerks', adminController.getClerks);
 router.post('/clerks', adminController.createClerk);
+router.get('/clerks/:id/messages', adminController.getClerkMessages);
+router.post('/clerks/:id/message', adminController.sendClerkMessage);
+router.put('/clerks/:id/status', adminController.updateClerkStatus);
+router.delete('/clerks/:id', adminController.deleteClerk);
 router.get('/complaints', adminController.getComplaints);
 router.put('/complaints/:id/status', adminController.updateComplaintStatus);
 router.post('/complaints/:id/message', adminController.sendComplaintMessage);
@@ -41,5 +45,6 @@ router.put('/scheme-applications/:id/progress', adminController.progressSchemeAp
 
 router.get('/profile', adminController.getAdminProfile);
 router.put('/profile', adminController.updateAdminProfile);
+router.put('/profile/password', adminController.updateAdminPassword);
 
 module.exports = router;

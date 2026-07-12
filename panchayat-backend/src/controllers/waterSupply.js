@@ -26,7 +26,7 @@ exports.updateWaterSupply = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
     const data = req.body;
-    const sched = await prisma.waterSupplySchedule.update({ where: { id: parseInt(req.params.schedule_id) }, data: { area: data.area, timing: data.timing, status: data.status, notes: data.notes } });
+    const sched = await prisma.waterSupplySchedule.update({ where: { id: req.params.schedule_id }, data: { area: data.area, timing: data.timing, status: data.status, notes: data.notes } });
     res.json({ message: "Water schedule updated successfully", schedule: sched });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };
@@ -34,7 +34,7 @@ exports.updateWaterSupply = async (req, res) => {
 exports.deleteWaterSupply = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    await prisma.waterSupplySchedule.delete({ where: { id: parseInt(req.params.schedule_id) } });
+    await prisma.waterSupplySchedule.delete({ where: { id: req.params.schedule_id } });
     res.json({ message: "Water schedule deleted successfully" });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };
@@ -63,7 +63,7 @@ exports.createWaterTank = async (req, res) => {
 exports.deleteWaterTank = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    await prisma.waterTank.delete({ where: { id: parseInt(req.params.tank_id) } });
+    await prisma.waterTank.delete({ where: { id: req.params.tank_id } });
     res.json({ message: "Water tank deleted successfully" });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };

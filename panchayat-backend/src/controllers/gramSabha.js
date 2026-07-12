@@ -23,7 +23,7 @@ exports.createGramSabha = async (req, res) => {
 
 exports.addGramSabhaSuggestion = async (req, res) => {
   try {
-    const meeting_id = parseInt(req.params.meeting_id);
+    const meeting_id = req.params.meeting_id;
     const data = req.body;
     const suggestion = await prisma.sabhaSuggestion.create({ data: { meeting_id, citizen_id: req.user.id, suggestion_text: data.suggestion_text } });
     const citizen = await prisma.user.findFirst({ where: { id: req.user.id } });
@@ -36,7 +36,7 @@ exports.addGramSabhaSuggestion = async (req, res) => {
 exports.addGramSabhaAttendance = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Only Admin or Clerk can mark meeting attendance" });
   try {
-    const meeting_id = parseInt(req.params.meeting_id);
+    const meeting_id = req.params.meeting_id;
     const citizen_id = parseInt(req.body.citizen_id || req.query.citizen_id);
     const attendance = await prisma.sabhaAttendance.create({ data: { meeting_id, citizen_id } });
     res.json({ message: "Attendance marked successfully", attendance });
@@ -46,7 +46,7 @@ exports.addGramSabhaAttendance = async (req, res) => {
 exports.updateGramSabhaMinutes = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Only Admin or Clerk can update meeting minutes and resolutions" });
   try {
-    const meeting_id = parseInt(req.params.meeting_id);
+    const meeting_id = req.params.meeting_id;
     const minutes_url = req.body.minutes_url || req.query.minutes_url;
     const resolutions = req.body.resolutions;
     
@@ -61,7 +61,7 @@ exports.updateGramSabhaMinutes = async (req, res) => {
 
 exports.addGramSabhaSuggestionReply = async (req, res) => {
   try {
-    const suggestion_id = parseInt(req.params.suggestion_id);
+    const suggestion_id = req.params.suggestion_id;
     const { reply_text } = req.body;
     if (!reply_text) return res.status(400).json({ detail: "Reply text is required" });
     const reply = await prisma.sabhaSuggestionReply.create({

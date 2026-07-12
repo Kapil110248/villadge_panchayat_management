@@ -46,12 +46,12 @@ export function Navbar({ role, onMenuClick }) {
     try {
       const token = localStorage.getItem("accessToken");
       if (!token) return;
-      const endpoint = role === "citizen" ? "/citizen/notifications" : "/notifications";
+      const endpoint = role === "admin" ? "/notifications" : "/citizen/notifications";
       const res = await api.get(endpoint, token);
       
       let fetchedNotifs = [];
       let unread = 0;
-      if (role === "citizen") {
+      if (role !== "admin") {
         fetchedNotifs = res || [];
         unread = fetchedNotifs.filter(n => !n.is_read).length;
       } else {
@@ -84,7 +84,7 @@ export function Navbar({ role, onMenuClick }) {
   const markAsRead = async (id, url) => {
     try {
       const token = localStorage.getItem("accessToken");
-      const endpoint = role === "citizen" ? `/citizen/notifications/${id}/read` : `/notifications/${id}/read`;
+      const endpoint = role === "admin" ? `/notifications/${id}/read` : `/citizen/notifications/${id}/read`;
       await api.put(endpoint, {}, token);
       fetchNotifications();
       if (url) {
@@ -101,7 +101,7 @@ export function Navbar({ role, onMenuClick }) {
   const markAllRead = async () => {
     try {
       const token = localStorage.getItem("accessToken");
-      const endpoint = role === "citizen" ? `/citizen/notifications/read-all` : `/notifications/read-all`;
+      const endpoint = role === "admin" ? `/notifications/read-all` : `/citizen/notifications/read-all`;
       await api.put(endpoint, {}, token);
       fetchNotifications();
     } catch (e) {}
@@ -301,7 +301,7 @@ export function Navbar({ role, onMenuClick }) {
           </button>
           
           {showNotifications && (
-            <div className="absolute top-full right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+            <div className="fixed top-20 left-4 right-4 sm:left-auto sm:right-0 sm:top-full sm:absolute sm:mt-2 sm:w-96 bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                 <h3 className="font-black text-slate-900">Notifications</h3>
                 {unreadCount > 0 && (

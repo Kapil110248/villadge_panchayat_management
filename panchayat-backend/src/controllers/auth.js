@@ -116,6 +116,10 @@ exports.login = async (req, res) => {
         return res.status(401).json({ detail: "Invalid credentials or incorrect role selected" });
       }
 
+      if (!user.is_active) {
+        return res.status(403).json({ detail: "Account has been suspended by the administrator." });
+      }
+
       const pwdMatch = verifyPassword(data.password, user.password_hash);
       console.log(`[LOGIN DEBUG] Password match: ${pwdMatch}`);
       if (!pwdMatch) {

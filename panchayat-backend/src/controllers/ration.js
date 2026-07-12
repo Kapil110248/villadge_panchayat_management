@@ -116,7 +116,7 @@ exports.createRation = async (req, res) => {
 exports.deleteRation = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    await prisma.rationSchedule.delete({ where: { id: parseInt(req.params.id) } });
+    await prisma.rationSchedule.delete({ where: { id: req.params.id } });
     res.json({ message: "Ration schedule deleted successfully" });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };

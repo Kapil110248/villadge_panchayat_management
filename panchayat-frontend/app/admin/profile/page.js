@@ -23,7 +23,11 @@ export default function AdminProfile() {
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSignModal, setShowSignModal] = useState(false);
+  const [showPwdModal, setShowPwdModal] = useState(false);
   const [editForm, setEditForm] = useState({ ...adminData });
+  const [pwdForm, setPwdForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
+  const [updatingPwd, setUpdatingPwd] = useState(false);
+  const [pwdError, setPwdError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingSignature, setUploadingSignature] = useState(false);
@@ -238,6 +242,33 @@ export default function AdminProfile() {
     }
   };
 
+  const handlePasswordUpdate = async (e) => {
+    e.preventDefault();
+    setPwdError("");
+    if (pwdForm.new_password !== pwdForm.confirm_password) {
+      setPwdError("New password and confirm password do not match");
+      return;
+    }
+    
+    try {
+      setUpdatingPwd(true);
+      const token = localStorage.getItem("accessToken");
+      await api.put("/admin/profile/password", {
+        current_password: pwdForm.current_password,
+        new_password: pwdForm.new_password
+      }, token);
+      
+      setToastMessage("Password updated successfully!");
+      setTimeout(() => setToastMessage(""), 3000);
+      setShowPwdModal(false);
+      setPwdForm({ current_password: "", new_password: "", confirm_password: "" });
+    } catch (e) {
+      setPwdError(e.message || "An error occurred while updating password.");
+    } finally {
+      setUpdatingPwd(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh] text-slate-500 font-semibold">
@@ -253,7 +284,10 @@ export default function AdminProfile() {
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Prashasan <span className="text-primary">Profile</span></h1>
           <p className="text-slate-500 font-medium mt-1">Official profile of the Village Administrator.</p>
         </div>
-        <Button onClick={() => setShowEditModal(true)} className="gap-2 bg-primary text-white hover:bg-primary-dark shadow-lg shadow-primary/20"><Edit className="w-4 h-4" /> Edit Profile</Button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto mt-2 md:mt-0">
+          <Button onClick={() => { setShowPwdModal(true); setPwdError(""); setPwdForm({ current_password: "", new_password: "", confirm_password: "" }); }} variant="outline" className="w-full sm:w-auto gap-2 shadow-sm"><ShieldAlert className="w-4 h-4" /> Change Password</Button>
+          <Button onClick={() => setShowEditModal(true)} className="w-full sm:w-auto gap-2 bg-primary text-white hover:bg-primary-dark shadow-lg shadow-primary/20"><Edit className="w-4 h-4" /> Edit Profile</Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -377,19 +411,21 @@ export default function AdminProfile() {
       {/* Edit Profile Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-2xl relative shadow-2xl border-0 animate-in fade-in zoom-in duration-200">
-            <button onClick={() => setShowEditModal(false)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+          <Card className="w-full max-w-2xl relative shadow-2xl border-0 animate-in fade-in zoom-in duration-200 max-h-[90vh] flex flex-col">
+            <button onClick={() => setShowEditModal(false)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all z-10">
               <X className="w-4 h-4" />
             </button>
-            <CardContent className="p-8">
-              <form onSubmit={handleUpdate} className="space-y-6">
-                <div className="flex items-center gap-4 mb-6">
-                  <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center"><User className="w-6 h-6 text-primary" /></div>
+            <div className="p-6 sm:p-8 shrink-0 pr-12 pb-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0"><User className="w-6 h-6 text-primary" /></div>
                   <div>
                     <h3 className="text-xl font-black text-slate-900">Edit Prashasan Profile</h3>
                     <p className="text-sm font-medium text-slate-500">Update village administrator settings.</p>
                   </div>
                 </div>
+            </div>
+            <CardContent className="p-6 sm:p-8 pt-0 overflow-y-auto">
+              <form onSubmit={handleUpdate} className="space-y-6">
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -435,18 +471,20 @@ export default function AdminProfile() {
       {/* Draw Signature Modal */}
       {showSignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-lg relative shadow-2xl border-0 animate-in fade-in zoom-in duration-200">
-            <button onClick={() => setShowSignModal(false)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+          <Card className="w-full max-w-lg relative shadow-2xl border-0 animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+            <button onClick={() => setShowSignModal(false)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all z-10">
               <X className="w-4 h-4" />
             </button>
-            <CardContent className="p-8 text-center">
-              <div className="flex items-center gap-4 mb-6 text-left">
-                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center"><Edit className="w-6 h-6 text-primary" /></div>
+            <div className="p-6 shrink-0 text-left pr-12 pb-0">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0"><Edit className="w-6 h-6 text-primary" /></div>
                 <div>
                   <h3 className="text-xl font-black text-slate-900">Draw Official Signature</h3>
                   <p className="text-sm font-medium text-slate-500">Sign directly inside the box below.</p>
                 </div>
               </div>
+            </div>
+            <CardContent className="p-6 text-center overflow-y-auto">
               
               <div className="border border-slate-200 rounded-2xl bg-white overflow-hidden mb-6 shadow-inner">
                 <canvas
@@ -470,6 +508,57 @@ export default function AdminProfile() {
                   {uploadingSignature ? "Saving..." : "Save Signature"}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Password Update Modal */}
+      {showPwdModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-md relative shadow-2xl border-0 animate-in fade-in zoom-in duration-200">
+            <button onClick={() => setShowPwdModal(false)} className="absolute top-4 right-4 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+              <X className="w-4 h-4" />
+            </button>
+            <CardContent className="p-8">
+              <form onSubmit={handlePasswordUpdate} className="space-y-6">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center"><ShieldAlert className="w-6 h-6 text-rose-500" /></div>
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900">Change Password</h3>
+                    <p className="text-sm font-medium text-slate-500">Update your account security.</p>
+                  </div>
+                </div>
+
+                {pwdError && (
+                  <div className="bg-rose-50 text-rose-600 text-sm font-semibold p-4 rounded-xl border border-rose-100 flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 shrink-0" />
+                    {pwdError}
+                  </div>
+                )}
+                
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Password</label>
+                    <input type="password" required value={pwdForm.current_password} onChange={e => setPwdForm({...pwdForm, current_password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">New Password</label>
+                    <input type="password" required value={pwdForm.new_password} onChange={e => setPwdForm({...pwdForm, new_password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Confirm New Password</label>
+                    <input type="password" required value={pwdForm.confirm_password} onChange={e => setPwdForm({...pwdForm, confirm_password: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none" />
+                  </div>
+                </div>
+                
+                <div className="pt-4 flex gap-4">
+                  <Button type="button" onClick={() => setShowPwdModal(false)} variant="outline" className="w-1/2 py-6 rounded-xl">Cancel</Button>
+                  <Button type="submit" disabled={updatingPwd} className="w-1/2 py-6 rounded-xl text-md font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-xl shadow-rose-500/20">
+                    {updatingPwd ? "Updating..." : "Update Password"}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
           </Card>
         </div>

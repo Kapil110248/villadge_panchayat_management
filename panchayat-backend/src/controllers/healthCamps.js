@@ -54,7 +54,7 @@ exports.createHealthCamp = async (req, res) => {
 exports.deleteHealthCamp = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    await prisma.healthCamp.delete({ where: { id: parseInt(req.params.id) } });
+    await prisma.healthCamp.delete({ where: { id: req.params.id } });
     res.json({ message: "Health camp deleted successfully" });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };
