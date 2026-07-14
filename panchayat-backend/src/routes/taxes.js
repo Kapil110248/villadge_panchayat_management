@@ -11,5 +11,6 @@ router.put('/taxes/:tax_id/approve', controller.approveTax);
 router.post('/taxes/levy', controller.levyTax);
 router.post('/taxes/generate', controller.generateTaxes);
 router.get('/taxes/analytics', controller.getTaxAnalytics);
-
+router.get('/taxes/config', controller.getTaxConfig);
+router.put('/taxes/config', controller.updateTaxConfig);
 module.exports = router;

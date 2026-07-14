@@ -20,6 +20,12 @@ export default function AdminWaterSupply() {
   const [tankForm, setTankForm] = useState({ location: "", capacity: "", condition: "Good" });
 
   const [toastMessage, setToastMessage] = useState("");
+  
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [scheduleToDelete, setScheduleToDelete] = useState(null);
+  
+  const [deleteTankModalOpen, setDeleteTankModalOpen] = useState(false);
+  const [tankToDelete, setTankToDelete] = useState(null);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -87,15 +93,23 @@ export default function AdminWaterSupply() {
     } catch (e) { alert(e.message); }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this schedule?")) return;
+  const handleDelete = (id) => {
+    setScheduleToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!scheduleToDelete) return;
     try {
       const token = localStorage.getItem("accessToken");
-      await api.delete(`/water-supply/${id}`, token);
+      await api.delete(`/water-supply/${scheduleToDelete}`, token);
       setToastMessage("Water schedule deleted!");
       setTimeout(() => setToastMessage(""), 3000);
       fetchData();
-    } catch (e) { alert(e.message); }
+    } catch (e) { alert(e.message); } finally {
+      setDeleteModalOpen(false);
+      setScheduleToDelete(null);
+    }
   };
 
   const activeCount = schedules.filter(s => s.status === "active").length;
@@ -118,15 +132,23 @@ export default function AdminWaterSupply() {
     } catch (e) { alert(e.message); }
   };
 
-  const handleDeleteTank = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this water tank?")) return;
+  const handleDeleteTank = (id) => {
+    setTankToDelete(id);
+    setDeleteTankModalOpen(true);
+  };
+
+  const confirmDeleteTank = async () => {
+    if (!tankToDelete) return;
     try {
       const token = localStorage.getItem("accessToken");
-      await api.delete(`/water-supply/tanks/${id}`, token);
+      await api.delete(`/water-supply/tanks/${tankToDelete}`, token);
       setToastMessage("Water tank deleted!");
       setTimeout(() => setToastMessage(""), 3000);
       fetchData();
-    } catch (e) { alert(e.message); }
+    } catch (e) { alert(e.message); } finally {
+      setDeleteTankModalOpen(false);
+      setTankToDelete(null);
+    }
   };
 
   return (
@@ -425,6 +447,56 @@ export default function AdminWaterSupply() {
           <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 font-medium">
             <CheckCircle className="w-5 h-5 text-emerald-400" />
             {toastMessage}
+          </div>
+        </div>
+      )}
+
+      {/* Modern Custom Delete Schedule Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 text-center space-y-4">
+              <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-black text-slate-900">Delete Schedule?</h3>
+              <p className="text-slate-500 font-medium leading-relaxed">
+                Are you sure you want to remove this water supply schedule? This action cannot be undone.
+              </p>
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4">
+              <Button variant="outline" onClick={() => setDeleteModalOpen(false)} className="flex-1 rounded-xl py-6 font-bold">
+                Cancel
+              </Button>
+              <Button onClick={confirmDelete} className="flex-1 rounded-xl py-6 bg-rose-500 hover:bg-rose-600 text-white font-bold shadow-lg shadow-rose-200">
+                Yes, Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Custom Delete Tank Modal */}
+      {deleteTankModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-8 text-center space-y-4">
+              <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 className="w-10 h-10" />
+              </div>
+              <h3 className="text-2xl font-black text-slate-900">Delete Water Tank?</h3>
+              <p className="text-slate-500 font-medium leading-relaxed">
+                Are you sure you want to remove this water tank from inventory? This action cannot be undone.
+              </p>
+            </div>
+            <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4">
+              <Button variant="outline" onClick={() => setDeleteTankModalOpen(false)} className="flex-1 rounded-xl py-6 font-bold">
+                Cancel
+              </Button>
+              <Button onClick={confirmDeleteTank} className="flex-1 rounded-xl py-6 bg-rose-500 hover:bg-rose-600 text-white font-bold shadow-lg shadow-rose-200">
+                Yes, Delete
+              </Button>
+            </div>
           </div>
         </div>
       )}

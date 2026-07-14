@@ -2,26 +2,33 @@ const { prisma } = require('../db');
 
 exports.getSuggestions = async (req, res) => {
   try {
+    const includeConfig = { 
+      user_usersuggestion_citizen_idTouser: { include: { citizenprofile: true } }, 
+      user_usersuggestion_processed_by_idTouser: true,
+      suggestionvote: { include: { user: true } } 
+    };
+    const mapSuggestion = (s) => ({
+      ...s,
+      citizen: s.user_usersuggestion_citizen_idTouser ? {
+        ...s.user_usersuggestion_citizen_idTouser,
+        profile: s.user_usersuggestion_citizen_idTouser.citizenprofile
+      } : null,
+      processed_by: s.user_usersuggestion_processed_by_idTouser,
+      votes: s.suggestionvote ? s.suggestionvote.map(v => ({ ...v, citizen: v.user })) : []
+    });
+
     let suggs = await prisma.userSuggestion.findMany({ 
-      include: { 
-        citizen: true, 
-        processed_by: true,
-        votes: { include: { citizen: true } } 
-      }, 
+      include: includeConfig, 
       orderBy: { submitted_at: 'desc' } 
     });
     if (suggs.length === 0) {
       await prisma.userSuggestion.create({ data: { citizen_id: req.user.id, title: "Establish a Public Library", description: "We need a village study room with local books and newspaper support.", status: "under_consideration" } });
       suggs = await prisma.userSuggestion.findMany({ 
-        include: { 
-          citizen: true, 
-          processed_by: true,
-          votes: { include: { citizen: true } } 
-        }, 
+        include: includeConfig, 
         orderBy: { submitted_at: 'desc' } 
       });
     }
-    res.json(suggs);
+    res.json(suggs.map(mapSuggestion));
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };
 
@@ -36,9 +43,23 @@ exports.createSuggestion = async (req, res) => {
 
 exports.voteSuggestion = async (req, res) => {
   try {
+    const suggestion = await prisma.userSuggestion.findUnique({ where: { id: req.params.id } });
+    if (!suggestion) return res.status(404).json({ detail: "Suggestion not found" });
+    if (suggestion.citizen_id === req.user.id) {
+      return res.status(400).json({ detail: "You cannot vote on your own suggestion" });
+    }
+    const existingVote = await prisma.suggestionVote.findFirst({
+      where: { suggestion_id: req.params.id, citizen_id: req.user.id }
+    });
+    if (existingVote) {
+      return res.status(400).json({ detail: "You have already upvoted this suggestion" });
+    }
     const vote = await prisma.suggestionVote.create({ data: { suggestion_id: req.params.id, citizen_id: req.user.id } });
     res.json({ message: "Suggestion upvoted!", vote });
-  } catch (error) { res.status(400).json({ detail: "You have already upvoted this suggestion" }); }
+  } catch (error) { 
+    console.error("Vote error:", error);
+    res.status(500).json({ detail: "Internal Server Error" }); 
+  }
 };
 
 exports.updateSuggestionStatus = async (req, res) => {

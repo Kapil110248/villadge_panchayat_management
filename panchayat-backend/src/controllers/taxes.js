@@ -5,8 +5,15 @@ const path = require('path');
 exports.getTaxes = async (req, res) => {
   try {
     if (['admin', 'clerk'].includes(req.user.role)) {
-      const taxes = await prisma.taxRecord.findMany({ include: { citizen: { include: { profile: true } } } });
-      return res.json(taxes);
+      const taxes = await prisma.taxRecord.findMany({ include: { user: { include: { citizenprofile: true } } } });
+      const formattedTaxes = taxes.map(t => ({
+        ...t,
+        citizen: t.user ? {
+          ...t.user,
+          profile: t.user.citizenprofile
+        } : null
+      }));
+      return res.json(formattedTaxes);
     } else {
       let taxes = await prisma.taxRecord.findMany({ where: { citizen_id: req.user.id } });
       if (taxes.length === 0) {
@@ -24,7 +31,7 @@ exports.payTax = async (req, res) => {
     const data = req.body;
     const taxRecord = await prisma.taxRecord.findUnique({
       where: { id: data.tax_record_id },
-      include: { citizen: true }
+      include: { user: true }
     });
     if (!taxRecord) return res.status(404).json({ detail: "Tax record not found" });
 
@@ -34,7 +41,7 @@ exports.payTax = async (req, res) => {
     await prisma.adminNotification.create({
       data: {
         title: "Tax Payment Submitted",
-        message: `${taxRecord.citizen.full_name} has submitted a payment of ₹${taxRecord.amount} for ${taxRecord.tax_type} tax. Transaction ID: ${data.transaction_id}. Please verify.`,
+        message: `${taxRecord.user.full_name} has submitted a payment of ₹${taxRecord.amount} for ${taxRecord.tax_type} tax. Transaction ID: ${data.transaction_id}. Please verify.`,
         type: "tax",
         action_url: "/admin/taxes",
         sender_id: req.user.id
@@ -91,10 +98,9 @@ exports.generateTaxes = async (req, res) => {
       if (config.last_generated_year === current_year) return res.status(400).json({ detail: "Yearly taxes already generated for this year." });
     }
     const allCitizens = await prisma.user.findMany({ 
-      where: { role: "citizen" },
-      include: { family_head: true }
+      where: { role: "citizen" }
     });
-    const citizens = allCitizens.filter(c => c.family_head !== null || c.family_member_id === null);
+    const citizens = allCitizens.filter(c => c.family_member_id === null);
 
     let count = 0;
     const due_date = new Date(data.due_date);
@@ -138,5 +144,39 @@ exports.getTaxAnalytics = async (req, res) => {
       try { const config = JSON.parse(fs.readFileSync(config_path)); if (config.last_generated_year === current_year) has_generated = true; } catch (e) {}
     }
     res.json({ house_collection_pct: (paid_house + unpaid_house) > 0 ? Math.round((paid_house / (paid_house + unpaid_house)) * 100) : 0, water_collection_pct: (paid_water + unpaid_water) > 0 ? Math.round((paid_water / (paid_water + unpaid_water)) * 100) : 0, total_collected: (paid_house * 450.0) + (paid_water * 180.0), total_unpaid: (unpaid_house * 450.0) + (unpaid_water * 180.0), has_generated_yearly: has_generated });
+  } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
+};
+
+exports.getTaxConfig = async (req, res) => {
+  try {
+    const config_path = path.join(__dirname, '../../tax_config.json');
+    let config = { last_generated_year: 0, upi_qr_url: "", bank_name: "", account_name: "", upi_id: "" };
+    if (fs.existsSync(config_path)) {
+      try { config = { ...config, ...JSON.parse(fs.readFileSync(config_path)) }; } catch (e) {}
+    }
+    res.json(config);
+  } catch (error) { 
+    console.error("Error in getTaxConfig:", error);
+    res.status(500).json({ detail: "Internal Server Error" }); 
+  }
+};
+
+exports.updateTaxConfig = async (req, res) => {
+  if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
+  try {
+    const data = req.body;
+    const config_path = path.join(__dirname, '../../tax_config.json');
+    let config = { last_generated_year: 0, upi_qr_url: "", bank_name: "", account_name: "", upi_id: "" };
+    if (fs.existsSync(config_path)) {
+      try { config = { ...config, ...JSON.parse(fs.readFileSync(config_path)) }; } catch (e) {}
+    }
+    
+    if (data.upi_qr_url !== undefined) config.upi_qr_url = data.upi_qr_url;
+    if (data.bank_name !== undefined) config.bank_name = data.bank_name;
+    if (data.account_name !== undefined) config.account_name = data.account_name;
+    if (data.upi_id !== undefined) config.upi_id = data.upi_id;
+    
+    fs.writeFileSync(config_path, JSON.stringify(config, null, 2));
+    res.json({ message: "Tax configuration updated successfully", config });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };

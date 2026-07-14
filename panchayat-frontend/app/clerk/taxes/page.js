@@ -241,80 +241,87 @@ export default function ClerkTaxes() {
 
       {/* Tax Records Table */}
       <Card id="tax-report-table">
-        <CardHeader className="flex flex-row items-center justify-between p-6 border-b border-slate-100" title="All Tax Records" subtitle="Complete ledger of property and water taxes" />
+        <CardHeader className="flex flex-row items-center justify-between p-6 border-b border-slate-100" title="Citizen Tax Summary" subtitle="Overview of taxes grouped by citizen" />
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-100 text-left">
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Citizen</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Type</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Due Date</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction ID</th>
+                <tr className="border-b border-slate-100 text-left bg-slate-50/50">
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Citizen Details</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Outstanding</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Paid</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {taxes.map(t => {
-                  const { months, penalty, total } = calculateTaxPenalty(t);
-                  return (
-                    <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                      <div className="flex items-center justify-between gap-2">
+                {(() => {
+                  const groupedTaxes = taxes.reduce((acc, tax) => {
+                    if (!tax.citizen) return acc;
+                    if (!acc[tax.citizen.id]) {
+                      acc[tax.citizen.id] = {
+                        citizen: tax.citizen,
+                        totalPaid: 0,
+                        totalUnpaid: 0,
+                        unpaidCount: 0,
+                        paidCount: 0
+                      };
+                    }
+                    const { total } = calculateTaxPenalty(tax);
+                    if (tax.status === "paid") {
+                      acc[tax.citizen.id].totalPaid += total;
+                      acc[tax.citizen.id].paidCount++;
+                    } else {
+                      acc[tax.citizen.id].totalUnpaid += total;
+                      acc[tax.citizen.id].unpaidCount++;
+                    }
+                    return acc;
+                  }, {});
+                  
+                  return Object.values(groupedTaxes).map(g => (
+                    <tr key={g.citizen.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold text-slate-900">
                         <div>
-                          {t.citizen?.full_name || "—"}
-                          {t.citizen?.profile?.father_name && (
-                            <span className="block text-xs font-semibold text-slate-400">
-                              S/O: {t.citizen.profile.father_name}
+                          {g.citizen.full_name}
+                          {g.citizen.profile?.father_name && (
+                            <span className="block text-xs font-semibold text-slate-400 mt-0.5">
+                              S/O: {g.citizen.profile.father_name}
                             </span>
                           )}
                         </div>
-                        {t.citizen && (
-                          <button
-                            onClick={() => setSelectedCitizenForHistory(t.citizen)}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition-all hover:text-emerald-600 shrink-0"
-                            title="View Tax History"
-                          >
-                            <History className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${t.tax_type === "house" ? "bg-amber-500/10 text-amber-700" : "bg-cyan-500/10 text-cyan-700"}`}>
-                          {t.tax_type}
-                        </span>
                       </td>
-                      <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                        {penalty > 0 ? (
+                      <td className="px-6 py-4">
+                        {g.totalUnpaid > 0 ? (
                           <div>
-                            <span className="text-xs text-slate-400 line-through mr-1">₹{t.amount.toLocaleString("en-IN")}</span>
-                            <span className="text-xs text-rose-500 font-bold block">+₹{penalty.toLocaleString("en-IN")} ({t.penalty_rate}% × {months} {months === 1 ? 'Month' : 'Months'})</span>
-                            <span className="text-sm font-black text-rose-600 block">₹{total.toLocaleString("en-IN")}</span>
+                            <span className="text-sm font-black text-rose-600 block">₹{g.totalUnpaid.toLocaleString("en-IN")}</span>
+                            <span className="text-[10px] font-bold text-rose-500/70">{g.unpaidCount} {g.unpaidCount === 1 ? 'Bill' : 'Bills'} Pending</span>
                           </div>
                         ) : (
-                          <span>₹{(t.amount || 0).toLocaleString("en-IN")}</span>
+                          <span className="text-xs font-bold text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-xs font-semibold text-slate-500">{t.due_date ? new Date(t.due_date).toLocaleDateString("en-IN") : "—"}</td>
                       <td className="px-6 py-4">
-                        {t.status === "paid" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-700 inline-flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Paid</span>}
-                        {t.status === "unpaid" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-rose-500/10 text-rose-700 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Unpaid</span>}
-                        {t.status === "pending" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-700 inline-flex items-center gap-1"><Clock className="w-3 h-3"/> Verifying</span>}
-                      </td>
-                      <td className="px-6 py-4 text-xs font-mono text-slate-500">{t.transaction_id || "—"}</td>
-                      <td className="px-6 py-4 text-right">
-                        {t.status === "pending" && (
-                          <Button onClick={() => handleApprove(t.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1 text-xs px-3">
-                            <Check className="w-3 h-3" /> Approve
-                          </Button>
+                        {g.totalPaid > 0 ? (
+                          <div>
+                            <span className="text-sm font-black text-emerald-600 block">₹{g.totalPaid.toLocaleString("en-IN")}</span>
+                            <span className="text-[10px] font-bold text-emerald-500/70">{g.paidCount} {g.paidCount === 1 ? 'Bill' : 'Bills'} Cleared</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-400">—</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button 
+                          onClick={() => setSelectedCitizenForHistory(g.citizen)} 
+                          size="sm" 
+                          variant="outline"
+                          className="border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg gap-2 text-xs px-4"
+                        >
+                          <History className="w-3.5 h-3.5" /> View Breakdown
+                        </Button>
                       </td>
                     </tr>
-                  );
-                })}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
@@ -485,9 +492,14 @@ export default function ClerkTaxes() {
                                     </div>
                                   )}
                                   {ct.status === "pending" && (
-                                    <div>
-                                      <span className="block text-[10px] text-slate-500">TxID: {ct.transaction_id || "—"}</span>
-                                      <span className="block text-[9px] text-amber-500 font-bold uppercase">Awaiting Approval</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div>
+                                        <span className="block text-[10px] text-slate-500">TxID: {ct.transaction_id || "—"}</span>
+                                        <span className="block text-[9px] text-amber-500 font-bold uppercase">Awaiting Approval</span>
+                                      </div>
+                                      <Button onClick={() => handleApprove(ct.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1 text-[10px] h-7 px-2">
+                                        <Check className="w-3 h-3" /> Approve
+                                      </Button>
                                     </div>
                                   )}
                                   {ct.status === "unpaid" && <span className="text-slate-400">—</span>}

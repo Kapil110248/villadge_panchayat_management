@@ -8,24 +8,42 @@ exports.getDirectory = async (req, res) => {
       const users = await prisma.user.findMany({
         where: {
           role: "citizen",
-          is_active: true,
-          family_member_id: null
+          is_active: true
         },
         include: {
-          profile: true,
-          family: true,
-          family_head: {
+          citizenprofile: true,
+          family_user_family_member_idTofamily: {
             include: {
-              members: {
+              user_family_head_idTouser: true
+            }
+          },
+          family_family_head_idTouser: {
+            include: {
+              user_user_family_member_idTofamily: {
                 include: {
-                  profile: true
+                  citizenprofile: true
                 }
               }
             }
           }
         }
       });
-      return res.json(users);
+      const formattedUsers = users.map(u => ({
+        ...u,
+        profile: u.citizenprofile,
+        family: u.family_user_family_member_idTofamily ? {
+          ...u.family_user_family_member_idTofamily,
+          head: u.family_user_family_member_idTofamily.user_family_head_idTouser
+        } : null,
+        family_head: u.family_family_head_idTouser ? {
+          ...u.family_family_head_idTouser,
+          members: (u.family_family_head_idTouser.user_user_family_member_idTofamily || []).map(m => ({
+            ...m,
+            profile: m.citizenprofile
+          }))
+        } : null
+      }));
+      return res.json(formattedUsers);
     } else {
       const me = await prisma.user.findUnique({
         where: { id: req.user.id },

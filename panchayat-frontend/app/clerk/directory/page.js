@@ -139,9 +139,26 @@ export default function ClerkDirectory() {
                         </div>
                         <div>
                           <span className="text-sm font-black text-slate-900 block group-hover:text-violet-700 transition-colors">{c.full_name}</span>
-                          {c.profile?.father_name && (
-                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">S/O: {c.profile.father_name}</span>
-                          )}
+                          {(() => {
+                            if (c.family_member_id && c.family?.head) {
+                              const headName = c.family.head.full_name;
+                              const rel = (c.bio || "Family Member").toLowerCase();
+                              let display = `${c.bio} of ${headName}`;
+                              if (rel === "son") display = `S/O: ${headName}`;
+                              else if (rel === "daughter") display = `D/O: ${headName}`;
+                              else if (rel === "wife") display = `W/O: ${headName}`;
+                              else if (rel === "husband") display = `H/O: ${headName}`;
+                              else if (rel === "father") display = `F/O: ${headName}`;
+                              else if (rel === "mother") display = `M/O: ${headName}`;
+                              else if (rel === "brother") display = `B/O: ${headName}`;
+                              else if (rel === "sister") display = `Sis/O: ${headName}`;
+                              
+                              return <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">{display}</span>;
+                            } else if (c.profile?.father_name) {
+                              return <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-0.5">S/O: {c.profile.father_name}</span>;
+                            }
+                            return null;
+                          })()}
                           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mt-1">Citizen ID: #{c.id}</span>
                         </div>
                       </div>

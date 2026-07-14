@@ -21,7 +21,8 @@ export default function SchemeManagement() {
     description: "",
     eligibility: "",
     documents: "",
-    benefits: "" 
+    benefits: "",
+    category: "General" 
   });
   const [formFields, setFormFields] = useState([]); // Dynamic custom fields
 
@@ -120,10 +121,26 @@ export default function SchemeManagement() {
       if (formData.documents) fullDescription += `\n\n📄 Required Documents:\n${formData.documents}`;
       if (formData.benefits) fullDescription += `\n\n💰 Benefits:\n${formData.benefits}`;
 
+      let icon = "BookOpen";
+      let color_theme = "bg-slate-100 text-slate-700";
+      
+      if (formData.category === "Agriculture") {
+         icon = "Tractor"; color_theme = "bg-emerald-100 text-emerald-700";
+      } else if (formData.category === "Education") {
+         icon = "GraduationCap"; color_theme = "bg-purple-100 text-purple-700";
+      } else if (formData.category === "Housing") {
+         icon = "Home"; color_theme = "bg-blue-100 text-blue-700";
+      } else if (formData.category === "Finance") {
+         icon = "IndianRupee"; color_theme = "bg-amber-100 text-amber-700";
+      }
+
       const payload = {
         scheme_name: formData.scheme_name,
         description: fullDescription.trim(),
         benefit: formData.benefits,
+        category: formData.category,
+        icon,
+        color_theme,
         form_fields: formFields
       };
 
@@ -164,11 +181,12 @@ export default function SchemeManagement() {
     }
 
     setFormData({
-       scheme_name: scheme.name,
+       scheme_name: scheme.scheme_name || scheme.name,
        description: baseDesc,
        eligibility: elig,
        documents: docs,
-       benefits: bens
+       benefits: bens,
+       category: scheme.category || "General"
     });
     setFormFields(scheme.form_fields || []);
     setEditMode(true);
@@ -180,7 +198,7 @@ export default function SchemeManagement() {
     setShowAddModal(false);
     setEditMode(false);
     setEditId(null);
-    setFormData({ scheme_name: "", description: "", eligibility: "", documents: "", benefits: "" });
+    setFormData({ scheme_name: "", description: "", eligibility: "", documents: "", benefits: "", category: "General" });
     setFormFields([]);
   };
 
@@ -246,6 +264,19 @@ export default function SchemeManagement() {
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Main Description *</label>
                     <textarea required rows={2} className="w-full mt-1 p-3.5 bg-slate-50 border-2 border-transparent focus:border-primary/20 focus:bg-white rounded-xl text-sm font-semibold transition-all outline-none resize-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} placeholder="What is this scheme about?" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Category *</label>
+                    <select required className="w-full mt-1 p-3.5 bg-slate-50 border-2 border-transparent focus:border-primary/20 focus:bg-white rounded-xl text-sm font-semibold transition-all outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                      <option value="General">General (Default)</option>
+                      <option value="Agriculture">Agriculture</option>
+                      <option value="Education">Education</option>
+                      <option value="Housing">Housing</option>
+                      <option value="Finance">Finance</option>
+                    </select>
                   </div>
                 </div>
 

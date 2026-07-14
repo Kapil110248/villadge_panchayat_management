@@ -27,6 +27,16 @@ export default function ClerkDashboard() {
     action_required: []
   });
   const [loading, setLoading] = useState(true);
+  const [shift, setShift] = useState("Morning");
+  const [shiftLoading, setShiftLoading] = useState(false);
+
+  const handleShiftToggle = () => {
+    setShiftLoading(true);
+    setTimeout(() => {
+      setShift(shift === "Morning" ? "Evening" : "Morning");
+      setShiftLoading(false);
+    }, 800);
+  };
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -63,7 +73,7 @@ export default function ClerkDashboard() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-widest mb-3">
-             <Clock className="w-3 h-3" /> Duty: Shift Morning
+             <Clock className="w-3 h-3" /> Duty: Shift {shift}
           </div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">Karmachari <span className="text-primary">Dashboard</span></h1>
           <p className="text-slate-500 font-medium mt-1">Ready to serve the citizens. 12 pending tasks require your attention.</p>
@@ -167,7 +177,13 @@ export default function ClerkDashboard() {
                     )}
                  </div>
               </div>
-              <Button className="w-full py-6 bg-white/10 hover:bg-white/20 border-none text-white rounded-2xl">Start Evening Shift</Button>
+              <Button 
+                onClick={handleShiftToggle} 
+                disabled={shiftLoading}
+                className="w-full py-6 bg-white/10 hover:bg-white/20 border-none text-white rounded-2xl transition-all"
+              >
+                {shiftLoading ? "Processing..." : `Start ${shift === "Morning" ? "Evening" : "Morning"} Shift`}
+              </Button>
            </CardContent>
         </Card>
       </div>

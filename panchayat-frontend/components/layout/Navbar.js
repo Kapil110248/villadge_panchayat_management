@@ -135,7 +135,7 @@ export function Navbar({ role, onMenuClick }) {
           } else {
             // Fetch public panchayat info
             try {
-              const pInfo = await api.get("/panchayat/info");
+              const pInfo = await api.get("/panchayat/info", token);
               if (pInfo && pInfo.village) {
                 setVillageName(pInfo.village);
               }

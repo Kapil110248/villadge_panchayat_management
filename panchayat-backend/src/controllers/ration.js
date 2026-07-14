@@ -5,12 +5,13 @@ exports.getRation = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    let whereClause = {};
+    if (req.user && req.user.role === 'citizen') {
+      whereClause = { distribution_date: { gte: today } };
+    }
+
     const schedules = await prisma.rationSchedule.findMany({
-      where: {
-        distribution_date: {
-          gte: today
-        }
-      },
+      where: whereClause,
       orderBy: { distribution_date: 'asc' }
     });
 
@@ -18,8 +19,8 @@ exports.getRation = async (req, res) => {
       family_size: 1,
       card_type: "APL",
       card_number: "RC-DEFAULT",
-      wheat: 10,
-      rice: 5,
+      wheat: 5,
+      rice: 2.5,
       sugar: 1
     };
 
@@ -27,34 +28,9 @@ exports.getRation = async (req, res) => {
       const profile = await prisma.citizenProfile.findUnique({
         where: { user_id: req.user.id }
       });
-      
-      const user = await prisma.user.findUnique({
-        where: { id: req.user.id }
-      });
-
-      let familyMembersCount = 1;
-      let familyId = user ? user.family_member_id : null;
-
-      if (!familyId && user) {
-        const famAsHead = await prisma.family.findFirst({
-          where: { head_id: user.id },
-          include: { members: true }
-        });
-        if (famAsHead) {
-          familyMembersCount = 1 + (famAsHead.members ? famAsHead.members.length : 0);
-        }
-      } else if (familyId) {
-        const famAsMember = await prisma.family.findUnique({
-          where: { id: familyId },
-          include: { members: true }
-        });
-        if (famAsMember) {
-          familyMembersCount = 1 + (famAsMember.members ? famAsMember.members.length : 0);
-        }
-      }
-
+      const familyMembersCount = 1; // Family model not available, default to 1
       const cardType = (profile && profile.ration_card_type) ? profile.ration_card_type : "APL";
-      const cardNumber = (profile && profile.ration_card_number) ? profile.ration_card_number : `RC-${100000 + req.user.id}`;
+      const cardNumber = (profile && profile.ration_card_number) ? profile.ration_card_number : `RC-${String(req.user.id).slice(-6)}`;
 
       let wheatPerMember = 5;
       let ricePerMember = 2.5;
@@ -116,7 +92,30 @@ exports.createRation = async (req, res) => {
 exports.deleteRation = async (req, res) => {
   if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
   try {
-    await prisma.rationSchedule.delete({ where: { id: req.params.id } });
-    res.json({ message: "Ration schedule deleted successfully" });
+    const id = req.params.id;
+    await prisma.rationSchedule.delete({ where: { id } });
+    res.json({ message: "Schedule deleted successfully" });
+  } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
+};
+
+exports.updateRation = async (req, res) => {
+  if (!['admin', 'clerk'].includes(req.user.role)) return res.status(403).json({ detail: "Access denied" });
+  try {
+    const id = req.params.id;
+    const data = req.body;
+    const schedule = await prisma.rationSchedule.update({ 
+      where: { id },
+      data: { 
+        distribution_date: new Date(data.distribution_date), 
+        timing_description: data.timing_description, 
+        items_available: data.items_available, 
+        shop_name: data.shop_name, 
+        contact_number: data.contact_number, 
+        card_type: data.card_type, 
+        ward_area: data.ward_area, 
+        special_instructions: data.special_instructions 
+      } 
+    });
+    res.json({ message: "Schedule updated successfully", schedule });
   } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
 };

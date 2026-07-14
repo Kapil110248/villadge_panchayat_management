@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Package, Calendar, Clock, Users, Plus, Trash2, X, CheckCircle, AlertTriangle } from "lucide-react";
+import { Package, Calendar, Clock, Users, Plus, Trash2, X, CheckCircle, AlertTriangle, Edit2 } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function AdminRation() {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ 
     distribution_date: "", 
     timing_description: "", 
@@ -38,7 +39,7 @@ export default function AdminRation() {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  const handleAdd = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const token = localStorage.getItem("accessToken");
@@ -46,17 +47,40 @@ export default function AdminRation() {
         ...formData,
         distribution_date: new Date(formData.distribution_date).toISOString()
       };
-      const res = await api.post("/ration", data, token);
-      setSchedules([...schedules, res.schedule]);
+      
+      if (editingId) {
+        const res = await api.put(`/ration/${editingId}`, data, token);
+        setSchedules(schedules.map(s => s.id === editingId ? res.schedule : s));
+        showToast("Ration schedule updated successfully!");
+      } else {
+        const res = await api.post("/ration", data, token);
+        setSchedules([res.schedule, ...schedules].sort((a, b) => new Date(b.distribution_date) - new Date(a.distribution_date)));
+        showToast("Ration schedule added successfully!");
+      }
+
       setShowModal(false);
+      setEditingId(null);
       setFormData({ 
         distribution_date: "", timing_description: "", items_available: "",
         shop_name: "", contact_number: "", card_type: "All Cards", ward_area: "", special_instructions: "" 
       });
-      showToast("Ration schedule added successfully!");
     } catch (e) {
-      showToast(e.message || "Failed to add schedule", "error");
+      showToast(e.message || "Failed to save schedule", "error");
     }
+  };
+
+  const handleEdit = (schedule) => {
+    setEditingId(schedule.id);
+    setFormData({
+      ...schedule,
+      distribution_date: schedule.distribution_date ? new Date(schedule.distribution_date).toISOString().split('T')[0] : "",
+      shop_name: schedule.shop_name || "",
+      contact_number: schedule.contact_number || "",
+      card_type: schedule.card_type || "All Cards",
+      ward_area: schedule.ward_area || "",
+      special_instructions: schedule.special_instructions || ""
+    });
+    setShowModal(true);
   };
 
   const confirmDelete = async () => {
@@ -83,7 +107,14 @@ export default function AdminRation() {
           <h1 className="text-4xl font-black text-slate-900">Ration Schedule</h1>
           <p className="text-slate-500 font-medium mt-1">Manage PDS distribution dates and item listings.</p>
         </div>
-        <Button onClick={() => setShowModal(true)} className="gap-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white shadow-xl shadow-teal-600/20">
+        <Button onClick={() => {
+          setEditingId(null);
+          setFormData({ 
+            distribution_date: "", timing_description: "", items_available: "",
+            shop_name: "", contact_number: "", card_type: "All Cards", ward_area: "", special_instructions: "" 
+          });
+          setShowModal(true);
+        }} className="gap-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white shadow-xl shadow-teal-600/20">
           <Plus className="w-4 h-4" /> Add Schedule
         </Button>
       </div>
@@ -119,6 +150,9 @@ export default function AdminRation() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="px-3 py-1 bg-emerald-500/10 text-emerald-700 text-[10px] font-black rounded-full uppercase">Scheduled</span>
+                    <button onClick={() => handleEdit(s)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 hover:border-indigo-200 rounded-xl transition-all">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
                     <button onClick={() => setDeleteConfirmId(s.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200 rounded-xl transition-all">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -160,70 +194,78 @@ export default function AdminRation() {
         </CardContent>
       </Card>
 
-      {/* Add Modal */}
+      {/* Add/Edit Schedule Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-teal-500/10 rounded-2xl flex items-center justify-center"><Calendar className="w-5 h-5 text-teal-600" /></div>
-                <h2 className="text-xl font-black text-slate-900">New Schedule</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-2xl relative shadow-2xl border-0 animate-in fade-in zoom-in duration-200 overflow-hidden rounded-[2rem]">
+            <button onClick={() => setShowModal(false)} className="absolute top-6 right-6 p-2 bg-slate-100 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all z-10">
+              <X className="w-4 h-4" />
+            </button>
+            <CardHeader className="bg-gradient-to-r from-teal-50 to-white border-b border-teal-100 pb-8 pt-8 px-8">
+              <div className="w-12 h-12 bg-teal-500/10 rounded-2xl flex items-center justify-center mb-4">
+                <Calendar className="w-6 h-6 text-teal-600" />
               </div>
-              <button onClick={() => setShowModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"><X className="w-4 h-4" /></button>
-            </div>
-            
-            <form onSubmit={handleAdd} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Distribution Date</label>
-                  <input type="date" required value={formData.distribution_date} onChange={e => setFormData({...formData, distribution_date: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Timing</label>
-                  <input type="text" required placeholder="09:00 AM - 05:00 PM" value={formData.timing_description} onChange={e => setFormData({...formData, timing_description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
-                </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900">{editingId ? "Edit Schedule" : "New Schedule"}</h2>
+                <p className="text-sm font-semibold text-slate-500 mt-1">{editingId ? "Update existing ration distribution details" : "Create a new ration distribution event"}</p>
               </div>
+            </CardHeader>
+            <CardContent className="p-8">
+              <form onSubmit={handleSubmit} className="space-y-6 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Distribution Date</label>
+                    <input type="date" required value={formData.distribution_date} onChange={e => setFormData({...formData, distribution_date: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Timing</label>
+                    <input type="text" required placeholder="09:00 AM - 05:00 PM" value={formData.timing_description} onChange={e => setFormData({...formData, timing_description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                  </div>
+                </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ration Shop / Dealer</label>
-                  <input type="text" placeholder="e.g. Ramu Kotedar, Shop 1" value={formData.shop_name} onChange={e => setFormData({...formData, shop_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ration Shop / Dealer</label>
+                    <input type="text" placeholder="e.g. Ramu Kotedar, Shop 1" value={formData.shop_name} onChange={e => setFormData({...formData, shop_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dealer Contact No.</label>
+                    <input type="tel" placeholder="e.g. 9876543210" value={formData.contact_number} onChange={e => setFormData({...formData, contact_number: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dealer Contact No.</label>
-                  <input type="tel" placeholder="e.g. 9876543210" value={formData.contact_number} onChange={e => setFormData({...formData, contact_number: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Card Eligibility</label>
+                    <select value={formData.card_type} onChange={e => setFormData({...formData, card_type: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all">
+                      <option value="All Cards">All Cards</option>
+                      <option value="BPL Only">BPL Only</option>
+                      <option value="AAY Only">AAY Only</option>
+                      <option value="APL Only">APL Only</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ward / Area (Optional)</label>
+                    <input type="text" placeholder="e.g. Ward 1 to 5" value={formData.ward_area} onChange={e => setFormData({...formData, ward_area: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Card Eligibility</label>
-                  <select value={formData.card_type} onChange={e => setFormData({...formData, card_type: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all">
-                    <option value="All Cards">All Cards</option>
-                    <option value="BPL Only">BPL Only</option>
-                    <option value="AAY Only">AAY Only</option>
-                    <option value="APL Only">APL Only</option>
-                  </select>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Items Available</label>
+                  <input type="text" required placeholder="e.g. Wheat (10kg), Rice (5kg)" value={formData.items_available} onChange={e => setFormData({...formData, items_available: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
                 </div>
+
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ward / Area (Optional)</label>
-                  <input type="text" placeholder="e.g. Ward 1 to 5" value={formData.ward_area} onChange={e => setFormData({...formData, ward_area: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Special Instructions</label>
+                  <textarea rows="2" placeholder="e.g. Bring your original Aadhaar Card..." value={formData.special_instructions} onChange={e => setFormData({...formData, special_instructions: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all resize-none"></textarea>
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Items Available</label>
-                <input type="text" required placeholder="e.g. Wheat (10kg), Rice (5kg)" value={formData.items_available} onChange={e => setFormData({...formData, items_available: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Special Instructions</label>
-                <textarea rows="2" placeholder="e.g. Bring your original Aadhaar Card..." value={formData.special_instructions} onChange={e => setFormData({...formData, special_instructions: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-teal-500/10 focus:border-teal-500 outline-none transition-all resize-none"></textarea>
-              </div>
-
-              <Button type="submit" className="w-full py-4 text-base bg-teal-600 hover:bg-teal-700 text-white rounded-xl shadow-xl shadow-teal-600/20">Add to Schedule</Button>
-            </form>
-          </div>
+                <Button type="submit" className="w-full py-6 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-base shadow-xl shadow-teal-600/20 mt-4">
+                  {editingId ? "Update Schedule" : "Publish Schedule"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
 

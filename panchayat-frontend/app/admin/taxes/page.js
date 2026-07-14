@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { IndianRupee, TrendingUp, AlertTriangle, CheckCircle, PieChart, Download, Plus, Clock, Check, X, History } from "lucide-react";
+import { IndianRupee, TrendingUp, AlertTriangle, CheckCircle, PieChart, Download, Plus, Clock, Check, X, History, Settings, Upload } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function AdminTaxes() {
@@ -34,6 +34,10 @@ export default function AdminTaxes() {
   
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generateForm, setGenerateForm] = useState({ house_tax_amount: 500, water_tax_amount: 200, due_date: "", penalty_rate: "" });
+  
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [configForm, setConfigForm] = useState({ bank_name: "", account_name: "", upi_id: "", upi_qr_url: "" });
+  const [uploadingQR, setUploadingQR] = useState(false);
 
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("success");
@@ -52,14 +56,16 @@ export default function AdminTaxes() {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem("accessToken");
-      const [taxData, analyticsData, directoryData] = await Promise.all([
+      const [taxData, analyticsData, directoryData, configData] = await Promise.all([
         api.get("/taxes", token),
         api.get("/taxes/analytics", token),
-        api.get("/directory", token)
+        api.get("/directory", token),
+        api.get("/taxes/config", token)
       ]);
       setTaxes(taxData);
       setAnalytics(analyticsData);
       setCitizens(directoryData || []);
+      setConfigForm(configData || { bank_name: "", account_name: "", upi_id: "", upi_qr_url: "" });
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
@@ -98,6 +104,42 @@ export default function AdminTaxes() {
       setCustomTaxType("");
       fetchData();
     } catch (e) { showToast(e.message, "error"); }
+  };
+
+  const handleConfigSave = async (e) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem("accessToken");
+      await api.put("/taxes/config", configForm, token);
+      showToast("Tax Payment Settings Updated!");
+      setShowConfigModal(false);
+      fetchData();
+    } catch (e) { showToast(e.message, "error"); }
+  };
+
+  const handleQRUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      setUploadingQR(true);
+      const token = localStorage.getItem("accessToken");
+      const fd = new FormData();
+      fd.append('file', file);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
+      const res = await fetch(`${apiUrl}/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const uploadData = await res.json();
+      setConfigForm(prev => ({ ...prev, upi_qr_url: uploadData.secure_url }));
+      showToast("QR Code uploaded successfully!");
+    } catch (err) {
+      showToast("Upload failed", "error");
+    } finally {
+      setUploadingQR(false);
+    }
   };
 
   const handleExport = () => {
@@ -187,6 +229,7 @@ export default function AdminTaxes() {
           <p className="text-slate-500 font-medium mt-1">Monitor house tax, water tax collections and defaulter reports.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Button onClick={() => setShowConfigModal(true)} variant="outline" className="gap-2 rounded-2xl bg-white text-slate-700 border-slate-200"><Settings className="w-4 h-4" /> Payment Settings</Button>
           <Button onClick={() => setShowLevyModal(true)} variant="outline" className="gap-2 rounded-2xl bg-white"><Plus className="w-4 h-4" /> Levy New Tax</Button>
           {!analytics?.has_generated_yearly && (
             <Button onClick={() => setShowGenerateModal(true)} className="gap-2 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white shadow-xl shadow-cyan-600/20"><TrendingUp className="w-4 h-4" /> Generate Yearly Taxes</Button>
@@ -259,80 +302,87 @@ export default function AdminTaxes() {
 
       {/* Tax Records Table */}
       <Card id="tax-report-table">
-        <CardHeader className="flex flex-row items-center justify-between p-6 border-b border-slate-100" title="All Tax Records" subtitle="Complete ledger of property and water taxes" />
+        <CardHeader className="flex flex-row items-center justify-between p-6 border-b border-slate-100" title="Citizen Tax Summary" subtitle="Overview of taxes grouped by citizen" />
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-100 text-left">
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Citizen</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Type</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Due Date</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction ID</th>
+                <tr className="border-b border-slate-100 text-left bg-slate-50/50">
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Citizen Details</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Outstanding</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Paid</th>
                   <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {taxes.map(t => {
-                  const { months, penalty, total } = calculateTaxPenalty(t);
-                  return (
-                    <tr key={t.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                      <div className="flex items-center justify-between gap-2">
+                {(() => {
+                  const groupedTaxes = taxes.reduce((acc, tax) => {
+                    if (!tax.citizen) return acc;
+                    if (!acc[tax.citizen.id]) {
+                      acc[tax.citizen.id] = {
+                        citizen: tax.citizen,
+                        totalPaid: 0,
+                        totalUnpaid: 0,
+                        unpaidCount: 0,
+                        paidCount: 0
+                      };
+                    }
+                    const { total } = calculateTaxPenalty(tax);
+                    if (tax.status === "paid") {
+                      acc[tax.citizen.id].totalPaid += total;
+                      acc[tax.citizen.id].paidCount++;
+                    } else {
+                      acc[tax.citizen.id].totalUnpaid += total;
+                      acc[tax.citizen.id].unpaidCount++;
+                    }
+                    return acc;
+                  }, {});
+                  
+                  return Object.values(groupedTaxes).map(g => (
+                    <tr key={g.citizen.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-bold text-slate-900">
                         <div>
-                          {t.citizen?.full_name || "—"}
-                          {t.citizen?.profile?.father_name && (
-                            <span className="block text-xs font-semibold text-slate-400">
-                              S/O: {t.citizen.profile.father_name}
+                          {g.citizen.full_name}
+                          {g.citizen.profile?.father_name && (
+                            <span className="block text-xs font-semibold text-slate-400 mt-0.5">
+                              S/O: {g.citizen.profile.father_name}
                             </span>
                           )}
                         </div>
-                        {t.citizen && (
-                          <button
-                            onClick={() => setSelectedCitizenForHistory(t.citizen)}
-                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg transition-all hover:text-emerald-600 shrink-0"
-                            title="View Tax History"
-                          >
-                            <History className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${t.tax_type === "house" ? "bg-amber-500/10 text-amber-700" : "bg-cyan-500/10 text-cyan-700"}`}>
-                          {t.tax_type}
-                        </span>
                       </td>
-                      <td className="px-6 py-4 text-sm font-bold text-slate-900">
-                        {penalty > 0 ? (
+                      <td className="px-6 py-4">
+                        {g.totalUnpaid > 0 ? (
                           <div>
-                            <span className="text-xs text-slate-400 line-through mr-1">₹{t.amount.toLocaleString("en-IN")}</span>
-                            <span className="text-xs text-rose-500 font-bold block">+₹{penalty.toLocaleString("en-IN")} ({t.penalty_rate}% × {months} {months === 1 ? 'Month' : 'Months'})</span>
-                            <span className="text-sm font-black text-rose-600 block">₹{total.toLocaleString("en-IN")}</span>
+                            <span className="text-sm font-black text-rose-600 block">₹{g.totalUnpaid.toLocaleString("en-IN")}</span>
+                            <span className="text-[10px] font-bold text-rose-500/70">{g.unpaidCount} {g.unpaidCount === 1 ? 'Bill' : 'Bills'} Pending</span>
                           </div>
                         ) : (
-                          <span>₹{(t.amount || 0).toLocaleString("en-IN")}</span>
+                          <span className="text-xs font-bold text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-xs font-semibold text-slate-500">{t.due_date ? new Date(t.due_date).toLocaleDateString("en-IN") : "—"}</td>
                       <td className="px-6 py-4">
-                        {t.status === "paid" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-700 inline-flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Paid</span>}
-                        {t.status === "unpaid" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-rose-500/10 text-rose-700 inline-flex items-center gap-1"><AlertTriangle className="w-3 h-3"/> Unpaid</span>}
-                        {t.status === "pending" && <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-700 inline-flex items-center gap-1"><Clock className="w-3 h-3"/> Verifying</span>}
-                      </td>
-                      <td className="px-6 py-4 text-xs font-mono text-slate-500">{t.transaction_id || "—"}</td>
-                      <td className="px-6 py-4 text-right">
-                        {t.status === "pending" && (
-                          <Button onClick={() => handleApprove(t.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1 text-xs px-3">
-                            <Check className="w-3 h-3" /> Approve
-                          </Button>
+                        {g.totalPaid > 0 ? (
+                          <div>
+                            <span className="text-sm font-black text-emerald-600 block">₹{g.totalPaid.toLocaleString("en-IN")}</span>
+                            <span className="text-[10px] font-bold text-emerald-500/70">{g.paidCount} {g.paidCount === 1 ? 'Bill' : 'Bills'} Cleared</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-bold text-slate-400">—</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button 
+                          onClick={() => setSelectedCitizenForHistory(g.citizen)} 
+                          size="sm" 
+                          variant="outline"
+                          className="border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg gap-2 text-xs px-4"
+                        >
+                          <History className="w-3.5 h-3.5" /> View Breakdown
+                        </Button>
                       </td>
                     </tr>
-                  );
-                })}
+                  ));
+                })()}
               </tbody>
             </table>
           </div>
@@ -545,9 +595,14 @@ export default function AdminTaxes() {
                                     </div>
                                   )}
                                   {ct.status === "pending" && (
-                                    <div>
-                                      <span className="block text-[10px] text-slate-500">TxID: {ct.transaction_id || "—"}</span>
-                                      <span className="block text-[9px] text-amber-500 font-bold uppercase">Awaiting Approval</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div>
+                                        <span className="block text-[10px] text-slate-500">TxID: {ct.transaction_id || "—"}</span>
+                                        <span className="block text-[9px] text-amber-500 font-bold uppercase">Awaiting Approval</span>
+                                      </div>
+                                      <Button onClick={() => handleApprove(ct.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg gap-1 text-[10px] h-7 px-2">
+                                        <Check className="w-3 h-3" /> Approve
+                                      </Button>
                                     </div>
                                   )}
                                   {ct.status === "unpaid" && <span className="text-slate-400">—</span>}
@@ -565,6 +620,69 @@ export default function AdminTaxes() {
           </div>
         );
       })()}
+
+      {/* Config Modal */}
+      {showConfigModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Payment Settings</h3>
+                <p className="text-xs text-slate-500 mt-1">Configure UPI QR and bank details</p>
+              </div>
+              <button onClick={() => setShowConfigModal(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm border border-slate-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <form onSubmit={handleConfigSave} className="p-6 space-y-5 overflow-y-auto">
+              
+              <div className="space-y-4">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-3">UPI QR Code Image</label>
+                  <div className="flex items-center gap-4">
+                    {configForm.upi_qr_url ? (
+                      <div className="relative group rounded-xl overflow-hidden border-2 border-dashed border-emerald-200 h-20 w-20 flex-shrink-0">
+                        <img src={configForm.upi_qr_url} alt="QR Code" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="h-20 w-20 rounded-xl border-2 border-dashed border-slate-200 bg-white flex items-center justify-center flex-shrink-0">
+                        <span className="text-[10px] text-slate-400 font-bold">No Image</span>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input type="file" id="qr-upload" className="hidden" accept="image/*" onChange={handleQRUpload} disabled={uploadingQR} />
+                      <label htmlFor="qr-upload" className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors">
+                        <Upload className="w-3.5 h-3.5" />
+                        {uploadingQR ? "Uploading..." : "Upload QR Image"}
+                      </label>
+                      <p className="text-[10px] text-slate-500 mt-2">Recommended: 1:1 aspect ratio</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-1.5">Bank Name</label>
+                  <input required type="text" value={configForm.bank_name} onChange={e => setConfigForm({...configForm, bank_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" placeholder="e.g. State Bank of India" />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-1.5">Account Name</label>
+                  <input required type="text" value={configForm.account_name} onChange={e => setConfigForm({...configForm, account_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" placeholder="e.g. Gram Panchayat Sarahi Tax A/C" />
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-widest mb-1.5">UPI ID</label>
+                  <input type="text" value={configForm.upi_id} onChange={e => setConfigForm({...configForm, upi_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" placeholder="e.g. sarahi@sbi" />
+                </div>
+              </div>
+              
+              <Button type="submit" className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-xl shadow-emerald-500/20">
+                Save Settings
+              </Button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modern Toast */}
       {toastMessage && (

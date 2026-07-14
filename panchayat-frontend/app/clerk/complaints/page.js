@@ -29,6 +29,9 @@ export default function ClerkComplaints() {
   // Update status modal
   const [statusModal, setStatusModal] = useState(null); // { id, currentStatus }
   const [newStatus, setNewStatus] = useState("");
+  
+  // Resolution modal
+  const [resolutionModal, setResolutionModal] = useState({ show: false, complaintId: null, message: "", photo: null, uploading: false });
 
   const fetchComplaints = async () => {
     try {
@@ -66,16 +69,38 @@ export default function ClerkComplaints() {
     }
   };
 
-  const handleQuickResolve = async (id) => {
-    const token = localStorage.getItem("accessToken");
-    setActionLoading(id);
+  const handleResolutionSubmit = async (e) => {
+    e.preventDefault();
+    setResolutionModal(prev => ({ ...prev, uploading: true }));
     try {
-      await api.put(`/clerk/complaints/${id}/status`, { status: "resolved" }, token);
+      const token = localStorage.getItem("accessToken");
+      let photo_url = null;
+      if (resolutionModal.photo) {
+        const formDataUpload = new FormData();
+        formDataUpload.append("file", resolutionModal.photo);
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001/api";
+        const uploadRes = await fetch(`${apiUrl}/upload`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+          body: formDataUpload
+        });
+        if (!uploadRes.ok) throw new Error("File upload failed");
+        const uploadData = await uploadRes.json();
+        photo_url = uploadData.secure_url;
+      }
+
+      await api.put(`/clerk/complaints/${resolutionModal.complaintId}/status`, { 
+        status: "resolution_proposed",
+        message: resolutionModal.message,
+        image_url: photo_url
+      }, token);
+
+      alert("Resolution proposed and citizen notified!");
+      setResolutionModal({ show: false, complaintId: null, message: "", photo: null, uploading: false });
       fetchComplaints();
     } catch (err) {
-      alert("Failed to resolve complaint.");
-    } finally {
-      setActionLoading(null);
+      alert("Error proposing resolution: " + err.message);
+      setResolutionModal(prev => ({ ...prev, uploading: false }));
     }
   };
 
@@ -155,7 +180,7 @@ export default function ClerkComplaints() {
           const cfg = getStatusConfig(complaint.status);
           const priorityKey = complaint.urgent ? "high" : "medium";
           const priorityCfg = PRIORITY_CONFIG[priorityKey];
-          const isResolved = complaint.status?.toLowerCase() === "resolved" || complaint.status?.toLowerCase() === "closed";
+          const isResolved = complaint.status?.toLowerCase() === "resolved" || complaint.status?.toLowerCase() === "closed" || complaint.status?.toLowerCase() === "resolution proposed";
           return (
             <Card
               key={complaint.id}
@@ -183,8 +208,20 @@ export default function ClerkComplaints() {
                       <p className="text-xs text-slate-500">
                         ID: <span className="font-mono font-bold">{complaint.ref_id}</span> • Submitted on {complaint.date}
                       </p>
+                      {complaint.subject && (
+                        <p className="text-sm font-semibold text-slate-800 mt-2">{complaint.subject}</p>
+                      )}
                       {complaint.description && (
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-1">{complaint.description}</p>
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">{complaint.description}</p>
+                      )}
+                      {complaint.image_url && complaint.image_url !== "null" && (
+                        <div className="mt-3">
+                          <img 
+                            src={complaint.image_url.startsWith('http') ? complaint.image_url : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:8001'}${complaint.image_url}`} 
+                            alt="Complaint Attachment" 
+                            className="h-24 w-auto object-cover rounded-lg border border-slate-200" 
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
@@ -209,10 +246,9 @@ export default function ClerkComplaints() {
                         <Button
                           size="sm"
                           className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={() => handleQuickResolve(complaint.id)}
-                          disabled={actionLoading === complaint.id}
+                          onClick={() => setResolutionModal({ show: true, complaintId: complaint.id, message: "", photo: null, uploading: false })}
                         >
-                          {actionLoading === complaint.id ? "..." : "Resolve"}
+                          Resolve (with proof)
                         </Button>
                       )}
                       {isResolved && (
@@ -231,39 +267,105 @@ export default function ClerkComplaints() {
 
       {/* Update Status Modal */}
       {statusModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-black text-slate-900">Update Status</h3>
-              <button onClick={() => setStatusModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-sm text-slate-500">
-              Complaint <span className="font-mono font-bold">{statusModal.ref_id}</span> ka status update karein.
-            </p>
-            <div className="space-y-2">
-              {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-                <button
-                  key={key}
-                  onClick={() => setNewStatus(key)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all ${newStatus === key ? "border-primary bg-primary/5" : "border-slate-200 hover:border-slate-300"}`}
-                >
-                  <span className="font-bold text-slate-800">{cfg.label}</span>
-                  {newStatus === key && <CheckCircle className="w-4 h-4 text-primary" />}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 relative bg-gradient-to-br from-slate-50 to-white border-b border-slate-100">
+              <div className="absolute top-4 right-4">
+                <button onClick={() => setStatusModal(null)} className="p-2 bg-white text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all shadow-sm border border-slate-100">
+                  <X className="w-4 h-4" />
                 </button>
-              ))}
+              </div>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Update Status</h3>
+              <p className="text-sm font-medium text-slate-500 mt-1">
+                Ref ID: <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">{statusModal.ref_id}</span>
+              </p>
             </div>
-            <div className="flex gap-3 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setStatusModal(null)}>Cancel</Button>
+            
+            <div className="p-6">
+              <div className="space-y-3 mb-8">
+                {Object.entries(STATUS_CONFIG)
+                  .filter(([key]) => key !== "resolved" && key !== "closed")
+                  .map(([key, cfg]) => {
+                    const isSelected = newStatus === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setNewStatus(key)}
+                        className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-200 ${
+                          isSelected 
+                            ? "border-primary bg-primary/5 shadow-md shadow-primary/10 scale-[1.02]" 
+                            : "border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isSelected ? "bg-primary text-white shadow-inner" : "bg-slate-100 text-slate-400"}`}>
+                           {key === "open" ? <AlertCircle className="w-5 h-5" /> : 
+                            key === "in_progress" ? <RefreshCw className="w-5 h-5" /> : 
+                            <CheckCircle className="w-5 h-5" />}
+                        </div>
+                        <div className="text-left flex-1">
+                           <span className={`block font-black text-lg ${isSelected ? "text-primary" : "text-slate-700"}`}>{cfg.label}</span>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-primary" : "border-slate-300"}`}>
+                           {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+                        </div>
+                      </button>
+                    )
+                })}
+              </div>
+
               <Button
-                className="flex-1 bg-primary hover:bg-primary/90"
+                className={`w-full py-6 rounded-2xl text-base font-black transition-all ${
+                  actionLoading !== null || newStatus === statusModal.currentStatus
+                    ? "bg-slate-100 text-slate-400"
+                    : "bg-slate-900 hover:bg-slate-800 text-white shadow-xl shadow-slate-900/20"
+                }`}
                 onClick={handleUpdateStatus}
                 disabled={actionLoading !== null || newStatus === statusModal.currentStatus}
               >
-                {actionLoading !== null ? "Saving..." : "Save Status"}
+                {actionLoading !== null ? "Saving Update..." : "Confirm Status Update"}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Resolution Modal */}
+      {resolutionModal.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+            <button onClick={() => setResolutionModal({ show: false, complaintId: null, message: "", photo: null, uploading: false })} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
+              <X className="w-5 h-5" />
+            </button>
+            <div className="mb-6">
+              <h3 className="text-xl font-black text-slate-900">Resolve Complaint</h3>
+              <p className="text-sm text-slate-500 mt-1">Proof and message for the citizen.</p>
+            </div>
+            <form onSubmit={handleResolutionSubmit} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">Resolution Message</label>
+                <textarea 
+                  required 
+                  rows={3}
+                  className="w-full p-3 border border-slate-200 focus:border-emerald-500 rounded-xl text-sm outline-none resize-none" 
+                  value={resolutionModal.message} 
+                  onChange={e => setResolutionModal({...resolutionModal, message: e.target.value})} 
+                  placeholder="Describe how the issue was resolved..." 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">Proof Photo (Required)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={e => setResolutionModal({...resolutionModal, photo: e.target.files[0]})}
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-sm"
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={resolutionModal.uploading} className="w-full py-5 rounded-xl text-sm bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20">
+                {resolutionModal.uploading ? "Submitting..." : "Submit Resolution"}
+              </Button>
+            </form>
           </div>
         </div>
       )}

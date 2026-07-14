@@ -37,18 +37,6 @@ export default function AdminSuggestions() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if(!confirm("Are you sure you want to delete this suggestion?")) return;
-    try {
-      const token = localStorage.getItem("accessToken");
-      await api.delete(`/suggestions/${id}`, token);
-      setSuggestions(suggestions.filter(s => s.id !== id));
-      showToast("Suggestion deleted successfully");
-    } catch (e) {
-      showToast("Delete failed: " + e.message, "error");
-    }
-  };
-
   const handleVote = async (id) => {
     try {
       const token = localStorage.getItem("accessToken");
@@ -161,9 +149,6 @@ export default function AdminSuggestions() {
                       <option value="accepted">Accepted</option>
                       <option value="rejected">Rejected</option>
                     </select>
-                    <button onClick={() => handleDelete(s.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
                 </div>
               </div>

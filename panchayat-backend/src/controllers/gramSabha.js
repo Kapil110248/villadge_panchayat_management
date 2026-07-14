@@ -2,14 +2,48 @@ const { prisma } = require('../db');
 
 exports.getGramSabha = async (req, res) => {
   try {
-    let meetings = await prisma.gramSabhaMeeting.findMany({ include: { suggestions: { include: { citizen: true, replies: { include: { citizen: true }, orderBy: { created_at: 'asc' } } } }, attendance: { include: { citizen: true } } }, orderBy: { date_time: 'desc' } });
-    if (meetings.length === 0) {
+    const fetchMeetings = async () => {
+      return await prisma.gramSabhaMeeting.findMany({
+        include: {
+          sabhasuggestion: {
+            include: {
+              user: true,
+              sabhasuggestionreply: { include: { user: true }, orderBy: { created_at: 'asc' } }
+            }
+          },
+          sabhaattendance: { include: { user: true } }
+        },
+        orderBy: { date_time: 'desc' }
+      });
+    };
+
+    const formatMeetings = (rawMeetings) => {
+      return rawMeetings.map(m => ({
+        ...m,
+        suggestions: m.sabhasuggestion.map(s => ({
+          ...s,
+          citizen: s.user,
+          replies: s.sabhasuggestionreply.map(r => ({ ...r, citizen: r.user }))
+        })),
+        attendance: m.sabhaattendance.map(a => ({
+          ...a,
+          citizen: a.user
+        }))
+      }));
+    };
+
+    let meetingsRaw = await fetchMeetings();
+    if (meetingsRaw.length === 0) {
       await prisma.gramSabhaMeeting.create({ data: { date_time: new Date(2026, 5, 25, 10, 30), agenda: "Road repair discussion...", location: "Gram Panchayat Bhawan Ground", notice_published: true } });
       await prisma.gramSabhaMeeting.create({ data: { date_time: new Date(2026, 4, 10, 11, 00), agenda: "Annual budget planning...", location: "Panchayat Hall", status: "completed", notice_published: true, minutes_url: "https://grampanchayat-sarahi.mp.gov.in/minutes/may-2026.pdf" } });
-      meetings = await prisma.gramSabhaMeeting.findMany({ include: { suggestions: { include: { citizen: true, replies: { include: { citizen: true }, orderBy: { created_at: 'asc' } } } }, attendance: { include: { citizen: true } } }, orderBy: { date_time: 'desc' } });
+      meetingsRaw = await fetchMeetings();
     }
-    res.json(meetings);
-  } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
+    
+    res.json(formatMeetings(meetingsRaw));
+  } catch (error) { 
+    console.error(error);
+    res.status(500).json({ detail: "Internal Server Error" }); 
+  }
 };
 
 exports.createGramSabha = async (req, res) => {

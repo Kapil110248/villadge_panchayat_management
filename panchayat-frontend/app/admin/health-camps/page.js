@@ -3,13 +3,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Heart, Plus, Calendar, MapPin, Users, Stethoscope, Trash2, X, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { Heart, Plus, Calendar, MapPin, Users, Stethoscope, Trash2, X, CheckCircle, AlertTriangle, Clock, Edit2 } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function AdminHealthCamps() {
   const [camps, setCamps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [formData, setFormData] = useState({ 
     camp_name: "", camp_type: "Vaccination", date: "", location: "", description: "",
@@ -34,22 +35,45 @@ export default function AdminHealthCamps() {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  const handleAdd = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const token = localStorage.getItem("accessToken");
       const data = { ...formData, date: new Date(formData.date).toISOString() };
-      const res = await api.post("/health-camps", data, token);
-      setCamps([res.camp, ...camps]);
+      
+      if (editingId) {
+        const res = await api.put(`/health-camps/${editingId}`, data, token);
+        setCamps(camps.map(c => c.id === editingId ? { ...c, ...res.camp } : c));
+        showToast("Health camp updated successfully!");
+      } else {
+        const res = await api.post("/health-camps", data, token);
+        setCamps([res.camp, ...camps].sort((a, b) => new Date(b.date) - new Date(a.date)));
+        showToast("Health camp added successfully!");
+      }
+      
       setShowModal(false);
+      setEditingId(null);
       setFormData({ 
         camp_name: "", camp_type: "Vaccination", date: "", location: "", description: "",
         timing: "", organizing_team: "", target_audience: "All Citizens", required_docs: ""
       });
-      showToast("Health camp added successfully!");
     } catch (e) {
-      showToast(e.message || "Failed to add health camp", "error");
+      showToast(e.message || "Failed to save health camp", "error");
     }
+  };
+
+  const handleEdit = (camp) => {
+    setEditingId(camp.id);
+    setFormData({
+      ...camp,
+      date: camp.date ? new Date(camp.date).toISOString().split('T')[0] : "",
+      camp_type: camp.camp_type || "Vaccination",
+      timing: camp.timing || "",
+      organizing_team: camp.organizing_team || "",
+      target_audience: camp.target_audience || "All Citizens",
+      required_docs: camp.required_docs || ""
+    });
+    setShowModal(true);
   };
 
   const confirmDelete = async () => {
@@ -76,7 +100,14 @@ export default function AdminHealthCamps() {
           <h1 className="text-4xl font-black text-slate-900">Health Camps</h1>
           <p className="text-slate-500 font-medium mt-1">Manage vaccination drives, health checkup camps, and registrations.</p>
         </div>
-        <Button onClick={() => setShowModal(true)} className="gap-2 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white shadow-xl shadow-rose-600/20">
+        <Button onClick={() => {
+          setEditingId(null);
+          setFormData({ 
+            camp_name: "", camp_type: "Vaccination", date: "", location: "", description: "",
+            timing: "", organizing_team: "", target_audience: "All Citizens", required_docs: ""
+          });
+          setShowModal(true);
+        }} className="gap-2 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white shadow-xl shadow-rose-600/20">
           <Plus className="w-4 h-4" /> Add Camp
         </Button>
       </div>
@@ -182,6 +213,9 @@ export default function AdminHealthCamps() {
                         <Users className="w-4 h-4 text-indigo-500 group-hover/btn:scale-110 transition-transform" />
                         <span className="text-sm font-black text-slate-700 group-hover/btn:text-indigo-600 transition-colors">{camp.registrations?.length || 0} registered</span>
                       </button>
+                      <button onClick={() => handleEdit(camp)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 hover:border-indigo-200 rounded-xl transition-all">
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                       <button onClick={() => setDeleteConfirmId(camp.id)} className="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200 rounded-xl transition-all">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -225,19 +259,19 @@ export default function AdminHealthCamps() {
         </CardContent>
       </Card>
 
-      {/* Add Modal */}
+      {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-rose-500/10 rounded-2xl flex items-center justify-center"><Heart className="w-5 h-5 text-rose-600" /></div>
-                <h2 className="text-xl font-black text-slate-900">New Health Camp</h2>
+                <h2 className="text-xl font-black text-slate-900">{editingId ? "Edit Health Camp" : "New Health Camp"}</h2>
               </div>
               <button onClick={() => setShowModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 transition-colors"><X className="w-4 h-4" /></button>
             </div>
             
-            <form onSubmit={handleAdd} className="p-6 space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[65vh] overflow-y-auto custom-scrollbar pr-2">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Camp Name</label>
                 <input type="text" required placeholder="e.g. Free Polio Vaccination" value={formData.camp_name} onChange={e => setFormData({...formData, camp_name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all" />
@@ -285,7 +319,9 @@ export default function AdminHealthCamps() {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</label>
                 <textarea rows="2" required placeholder="Details about the camp..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 outline-none transition-all resize-none"></textarea>
               </div>
-              <Button type="submit" className="w-full py-4 text-base bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xl shadow-rose-600/20">Create Camp</Button>
+              <Button type="submit" className="w-full py-4 text-base bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xl shadow-rose-600/20">
+                {editingId ? "Update Schedule" : "Add to Schedule"}
+              </Button>
             </form>
           </div>
         </div>

@@ -143,6 +143,12 @@ export default function AdminComplaints() {
                 )}
               </div>
               <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subject / Issue</label>
+                <div className="p-4 bg-slate-50 rounded-xl mt-1 text-sm font-bold text-slate-900">
+                  {selectedComplaint.subject || "No subject provided."}
+                </div>
+              </div>
+              <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</label>
                 <div className="p-4 bg-slate-50 rounded-xl mt-1 text-sm font-medium text-slate-700">
                   {selectedComplaint.description || "No description provided."}
@@ -241,12 +247,13 @@ export default function AdminComplaints() {
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">Proof Photo (Optional)</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">Proof Photo (Required)</label>
                 <input 
                   type="file" 
                   accept="image/*"
                   onChange={e => setResolutionModal({...resolutionModal, photo: e.target.files[0]})}
                   className="w-full p-2 bg-slate-50 rounded-xl text-sm"
+                  required
                 />
               </div>
               <Button type="submit" disabled={resolutionModal.uploading} className="w-full py-6 rounded-xl text-sm bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-600/20">
@@ -297,6 +304,21 @@ export default function AdminComplaints() {
                       <span>•</span>
                       <p>Posted on {complaint.date}</p>
                     </div>
+                    {complaint.subject && (
+                      <p className="text-sm font-semibold text-slate-800 mt-2">{complaint.subject}</p>
+                    )}
+                    {complaint.description && (
+                      <p className="text-xs text-slate-400 mt-1 line-clamp-1">{complaint.description}</p>
+                    )}
+                    {complaint.image_url && complaint.image_url !== "null" && (
+                      <div className="mt-3">
+                        <img 
+                          src={complaint.image_url.startsWith('http') ? complaint.image_url : `${process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace('/api', '') : 'http://localhost:8001'}${complaint.image_url}`} 
+                          alt="Complaint Attachment" 
+                          className="h-16 w-auto object-cover rounded-lg border border-slate-200" 
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

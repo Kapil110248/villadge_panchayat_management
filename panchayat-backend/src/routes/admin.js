@@ -30,6 +30,7 @@ router.delete('/schemes/:id', adminController.deleteScheme);
 router.put('/schemes/:id', adminController.updateScheme);
 router.put('/schemes/:id/toggle', adminController.toggleScheme);
 router.get('/reports/stats', adminController.getReportStats);
+router.get('/reports/data', adminController.getReportData);
 router.get('/gram-sabha', adminController.getGramSabha);
 router.post('/gram-sabha', adminController.createGramSabha);
 router.put('/gram-sabha/:id/minutes', adminController.updateGramSabhaMinutes);

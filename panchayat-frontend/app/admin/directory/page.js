@@ -51,9 +51,20 @@ export default function AdminDirectory() {
     c.mobile?.includes(search)
   );
 
+  const exportToPDF = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-8">
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+      {/* Print Only Header */}
+      <div className="hidden print:block text-center space-y-2 mb-8 border-b-2 border-slate-800 pb-4">
+        <h1 className="text-3xl font-black text-slate-900 uppercase tracking-widest">Gram Panchayat Sarahi</h1>
+        <h2 className="text-xl font-bold text-slate-700">Official Citizen Directory Report</h2>
+        <p className="text-sm font-semibold text-slate-500">Date Generated: {new Date().toLocaleDateString('en-IN')} | Total Registered Citizens: {citizens.length}</p>
+      </div>
+
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 no-print">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-violet-500/10 text-violet-600 rounded-xl text-[10px] font-black uppercase tracking-widest mb-3">
             <Users className="w-3 h-3" /> Village Directory
@@ -62,12 +73,12 @@ export default function AdminDirectory() {
           <p className="text-slate-500 font-medium mt-1">Complete registry of all active registered village residents.</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" className="gap-2 rounded-2xl"><Download className="w-4 h-4" /> Export CSV</Button>
+          <Button variant="outline" onClick={exportToPDF} className="gap-2 rounded-2xl"><Download className="w-4 h-4" /> Export PDF</Button>
         </div>
       </div>
 
       {/* Search & Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 no-print">
         <div className="lg:col-span-3 flex flex-col justify-center">
           <div className="relative w-full">
             <input type="text" placeholder="Search by name, email or phone..." value={search} onChange={e => setSearch(e.target.value)}
@@ -81,19 +92,19 @@ export default function AdminDirectory() {
       </div>
 
       {/* Directory Table */}
-      <Card>
-        <CardHeader title="Registered Citizens" subtitle={`Showing ${filtered.length} of ${citizens.length} records`} />
+      <Card className="print:shadow-none print:border-none print:bg-transparent">
+        <CardHeader title="Registered Citizens" subtitle={`Showing ${filtered.length} of ${citizens.length} records`} className="print:pb-2" />
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full print:text-xs">
               <thead>
-                <tr className="border-b border-slate-100 text-left">
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Citizen</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Email</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Phone</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ward</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Family</th>
-                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Registered</th>
+                <tr className="border-b border-slate-100 text-left print:border-slate-300">
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black print:px-2">Citizen</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black print:px-2">Email</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black print:px-2">Phone</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black print:px-2">Ward</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black print:px-2">Family</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black print:px-2">Registered</th>
                 </tr>
               </thead>
               <tbody>
@@ -102,8 +113,8 @@ export default function AdminDirectory() {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">No citizens found</td></tr>
                 ) : filtered.map(c => (
-                  <tr key={c.id} onClick={() => setSelectedCitizen(c)} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors cursor-pointer">
-                    <td className="px-6 py-4">
+                  <tr key={c.id} onClick={() => setSelectedCitizen(c)} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors cursor-pointer print:border-slate-200">
+                    <td className="px-6 py-4 print:px-2">
                       <div className="flex items-center gap-3">
                         <div onClick={(e) => {
                           e.stopPropagation();
@@ -111,7 +122,7 @@ export default function AdminDirectory() {
                           if (imgUrl) {
                             setSelectedImage(imgUrl.startsWith('http') ? imgUrl : `http://localhost:8001${imgUrl}`);
                           }
-                        }} className={`w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-xl flex items-center justify-center text-white text-xs font-black overflow-hidden ${(c.avatar_url || c.profile?.avatar_url) ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}>
+                        }} className={`w-10 h-10 bg-gradient-to-br from-violet-500 to-indigo-500 rounded-xl flex items-center justify-center text-white text-xs font-black overflow-hidden ${(c.avatar_url || c.profile?.avatar_url) ? 'cursor-pointer hover:scale-105 transition-transform' : ''} print:hidden`}>
                           {c.avatar_url || c.profile?.avatar_url ? (
                             <img src={(c.avatar_url || c.profile?.avatar_url).startsWith('http') ? (c.avatar_url || c.profile?.avatar_url) : `http://localhost:8001${c.avatar_url || c.profile?.avatar_url}`} alt={c.full_name} className="w-full h-full object-cover" />
                           ) : (
@@ -119,20 +130,37 @@ export default function AdminDirectory() {
                           )}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-slate-900">{c.full_name}</p>
-                          {c.profile?.father_name && (
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">S/O: {c.profile.father_name}</p>
-                          )}
+                          <p className="text-sm font-bold text-slate-900 print:text-black">{c.full_name}</p>
+                          {(() => {
+                            if (c.family_member_id && c.family?.head) {
+                              const headName = c.family.head.full_name;
+                              const rel = (c.bio || "Family Member").toLowerCase();
+                              let display = `${c.bio} of ${headName}`;
+                              if (rel === "son") display = `S/O: ${headName}`;
+                              else if (rel === "daughter") display = `D/O: ${headName}`;
+                              else if (rel === "wife") display = `W/O: ${headName}`;
+                              else if (rel === "husband") display = `H/O: ${headName}`;
+                              else if (rel === "father") display = `F/O: ${headName}`;
+                              else if (rel === "mother") display = `M/O: ${headName}`;
+                              else if (rel === "brother") display = `B/O: ${headName}`;
+                              else if (rel === "sister") display = `Sis/O: ${headName}`;
+                              
+                              return <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 print:text-slate-600">{display}</p>;
+                            } else if (c.profile?.father_name) {
+                              return <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5 print:text-slate-600">S/O: {c.profile.father_name}</p>;
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-xs font-semibold text-slate-500">{c.email || "—"}</td>
-                    <td className="px-6 py-4 text-xs font-semibold text-slate-500">{c.mobile || "—"}</td>
-                    <td className="px-6 py-4 text-xs font-semibold text-slate-500">{c.family?.ward_number || c.family_head?.ward_number || "—"}</td>
-                    <td className="px-6 py-4 text-xs font-semibold text-slate-500">
+                    <td className="px-6 py-4 text-xs font-semibold text-slate-500 print:text-black print:px-2">{c.email || "—"}</td>
+                    <td className="px-6 py-4 text-xs font-semibold text-slate-500 print:text-black print:px-2">{c.mobile || "—"}</td>
+                    <td className="px-6 py-4 text-xs font-semibold text-slate-500 print:text-black print:px-2">{c.family?.ward_number || c.family_head?.ward_number || "—"}</td>
+                    <td className="px-6 py-4 text-xs font-semibold text-slate-500 print:text-black print:px-2">
                       {c.family_head ? `${(c.family_head.members?.length || 0) + 1} Member(s)` : (c.family ? "Family Member" : "—")}
                     </td>
-                    <td className="px-6 py-4 text-xs font-semibold text-slate-400">{c.created_at ? new Date(c.created_at).toLocaleDateString("en-IN") : "—"}</td>
+                    <td className="px-6 py-4 text-xs font-semibold text-slate-400 print:text-black print:px-2">{c.created_at ? new Date(c.created_at).toLocaleDateString("en-IN") : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -140,6 +168,20 @@ export default function AdminDirectory() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Print Only Footer */}
+      <div className="hidden print:flex justify-between items-end mt-24 px-12 pt-16">
+        <div className="text-center">
+          <div className="w-48 border-b-2 border-slate-800 mb-3 mx-auto"></div>
+          <p className="font-bold text-slate-900 text-lg">Panchayat Secretary</p>
+          <p className="text-sm text-slate-600">Signature & Official Seal</p>
+        </div>
+        <div className="text-center">
+          <div className="w-48 border-b-2 border-slate-800 mb-3 mx-auto"></div>
+          <p className="font-bold text-slate-900 text-lg">Gram Sarpanch</p>
+          <p className="text-sm text-slate-600">Signature & Official Seal</p>
+        </div>
+      </div>
 
       {/* Detailed Citizen Profile Modal */}
       {selectedCitizen && (

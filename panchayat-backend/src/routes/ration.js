@@ -7,6 +7,7 @@ router.use(authenticateToken);
 
 router.get('/ration', controller.getRation);
 router.post('/ration', controller.createRation);
+router.put('/ration/:id', controller.updateRation);
 router.delete('/ration/:id', controller.deleteRation);
 
 module.exports = router;

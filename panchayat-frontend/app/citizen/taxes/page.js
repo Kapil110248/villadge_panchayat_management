@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { CreditCard, Receipt, ShieldCheck, HelpCircle, AlertCircle, Clock, CheckCircle, AlertTriangle } from "lucide-react";
+import { CreditCard, Receipt, ShieldCheck, HelpCircle, AlertCircle, Clock, CheckCircle, AlertTriangle, X, QrCode } from "lucide-react";
 import { api } from "@/lib/api";
 
 export default function CitizenTaxes() {
@@ -25,9 +25,13 @@ export default function CitizenTaxes() {
 
   const [taxes, setTaxes] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [taxConfig, setTaxConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [payingTaxId, setPayingTaxId] = useState(null);
-
+  
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [selectedTax, setSelectedTax] = useState(null);
+  const [manualTxId, setManualTxId] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState("success");
 
@@ -46,12 +50,14 @@ export default function CitizenTaxes() {
   const fetchTaxes = async () => {
     try {
       const token = localStorage.getItem("accessToken");
-      const [taxData, analyticsData] = await Promise.all([
+      const [taxData, analyticsData, configData] = await Promise.all([
         api.get("/taxes", token),
-        api.get("/taxes/analytics", token)
+        api.get("/taxes/analytics", token),
+        api.get("/taxes/config", token)
       ]);
       setTaxes(taxData);
       setAnalytics(analyticsData);
+      setTaxConfig(configData);
     } catch (error) {
       console.error("Failed to load taxes:", error);
     } finally {
@@ -59,20 +65,25 @@ export default function CitizenTaxes() {
     }
   };
 
-  const handlePayTax = async (taxId) => {
-    setPayingTaxId(taxId);
+  const openPayModal = (tax) => {
+    setSelectedTax(tax);
+    setManualTxId("");
+    setShowPayModal(true);
+  };
+
+  const submitPayment = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    
+    setPayingTaxId(selectedTax.id);
     try {
-      // Simulate Payment gateway delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
       const token = localStorage.getItem("accessToken");
-      const txId = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
       await api.post("/taxes/pay", {
-        tax_record_id: taxId,
-        transaction_id: txId
+        tax_record_id: selectedTax.id,
+        transaction_id: manualTxId || ("UPI-" + Math.floor(1000000000 + Math.random() * 9000000000))
       }, token);
       
-      showToast(`Payment Success! Transaction ID: ${txId}`);
+      showToast(`Payment Submitted!`);
+      setShowPayModal(false);
       fetchTaxes();
     } catch (error) {
       console.error("Payment failed:", error);
@@ -324,7 +335,7 @@ export default function CitizenTaxes() {
                           )}
                         </div>
                         <Button
-                          onClick={() => handlePayTax(tax.id)}
+                          onClick={() => openPayModal(tax)}
                           disabled={payingTaxId !== null}
                           className="bg-primary hover:bg-primary-dark text-white rounded-xl font-bold px-6 py-3.5"
                         >
@@ -454,6 +465,93 @@ export default function CitizenTaxes() {
           </Card>
         </div>
       </div>
+
+      {/* Payment Modal */}
+      {showPayModal && selectedTax && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Scan & Pay</h3>
+                <p className="text-xs text-slate-500 mt-1 capitalize">{selectedTax.tax_type} Tax Payment</p>
+              </div>
+              <button onClick={() => setShowPayModal(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm border border-slate-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <form onSubmit={submitPayment} className="p-6 space-y-6 overflow-y-auto">
+              
+              <div className="text-center space-y-4">
+                <div className="bg-emerald-50 text-emerald-700 py-3 rounded-2xl border border-emerald-100">
+                  <span className="text-xs font-black tracking-widest uppercase">Amount Due</span>
+                  <div className="text-3xl font-black">₹{calculateTaxPenalty(selectedTax).total.toFixed(2)}</div>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex justify-center">
+                  {taxConfig?.upi_qr_url ? (
+                    <img src={taxConfig.upi_qr_url} alt="Scan to pay" className="w-48 h-48 rounded-xl object-contain bg-white p-2 shadow-sm border border-slate-200" />
+                  ) : (
+                    <div className="w-48 h-48 rounded-xl bg-white border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400">
+                      <QrCode className="w-8 h-8 mb-2 opacity-50" />
+                      <span className="text-xs font-bold text-center px-4">UPI QR not configured by Admin</span>
+                    </div>
+                  )}
+                </div>
+
+                {(taxConfig?.bank_name || taxConfig?.account_name || taxConfig?.upi_id) ? (
+                  <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100/50 text-left">
+                    <p className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-1 flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /> Payment directed to:</p>
+                    <p className="text-sm font-black text-slate-700">{taxConfig.bank_name}</p>
+                    <p className="text-xs font-semibold text-slate-500">{taxConfig.account_name}</p>
+                    {taxConfig.upi_id && <p className="text-[10px] font-mono text-slate-400 mt-0.5">{taxConfig.upi_id}</p>}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <a 
+                  href={`gpay://upi/pay?pa=${taxConfig?.upi_id}&pn=${encodeURIComponent(taxConfig?.account_name || 'Panchayat')}&am=${selectedTax ? calculateTaxPenalty(selectedTax).total.toFixed(2) : 0}&cu=INR&tn=${encodeURIComponent((selectedTax?.tax_type || '') + ' Tax')}`}
+                  className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-500 hover:bg-emerald-50 transition-all text-slate-700"
+                >
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" alt="GPay" className="h-6 mb-2 object-contain" />
+                  <span className="text-xs font-bold">Google Pay</span>
+                </a>
+                <a 
+                  href={`phonepe://pay?pa=${taxConfig?.upi_id}&pn=${encodeURIComponent(taxConfig?.account_name || 'Panchayat')}&am=${selectedTax ? calculateTaxPenalty(selectedTax).total.toFixed(2) : 0}&cu=INR&tn=${encodeURIComponent((selectedTax?.tax_type || '') + ' Tax')}`}
+                  className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:border-indigo-500 hover:bg-indigo-50 transition-all text-slate-700"
+                >
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-6 mb-2 object-contain" />
+                  <span className="text-xs font-bold">PhonePe</span>
+                </a>
+                <a 
+                  href={`paytmmp://pay?pa=${taxConfig?.upi_id}&pn=${encodeURIComponent(taxConfig?.account_name || 'Panchayat')}&am=${selectedTax ? calculateTaxPenalty(selectedTax).total.toFixed(2) : 0}&cu=INR&tn=${encodeURIComponent((selectedTax?.tax_type || '') + ' Tax')}`}
+                  className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:border-cyan-500 hover:bg-cyan-50 transition-all text-slate-700"
+                >
+                  <img src="https://upload.wikimedia.org/wikipedia/commons/c/cd/Paytm_logo.svg" alt="Paytm" className="h-4 mb-2 object-contain" />
+                  <span className="text-xs font-bold">Paytm</span>
+                </a>
+                <a 
+                  href={`upi://pay?pa=${taxConfig?.upi_id}&pn=${encodeURIComponent(taxConfig?.account_name || 'Panchayat')}&am=${selectedTax ? calculateTaxPenalty(selectedTax).total.toFixed(2) : 0}&cu=INR&tn=${encodeURIComponent((selectedTax?.tax_type || '') + ' Tax')}`}
+                  className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 hover:bg-slate-50 transition-all text-slate-700"
+                >
+                  <div className="h-6 mb-2 flex items-center justify-center text-slate-600 font-black">UPI</div>
+                  <span className="text-xs font-bold">Other UPI App</span>
+                </a>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100">
+                <Button type="button" onClick={() => submitPayment()} disabled={payingTaxId !== null} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-xl shadow-emerald-500/20 disabled:opacity-50">
+                  {payingTaxId !== null ? "Submitting..." : "I have paid successfully"}
+                </Button>
+                <p className="text-[10px] text-center text-slate-400 mt-2">Click above only after you have completed the payment via your UPI app.</p>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Modern Toast */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 fade-in duration-300">

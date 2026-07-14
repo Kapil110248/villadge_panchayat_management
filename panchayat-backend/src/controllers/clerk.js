@@ -7,11 +7,11 @@ exports.getClerkDashboardStats = async (req, res) => {
     const pending_review = await prisma.certificate.count({ where: { status: "pending" } });
     const processed = await prisma.certificate.count({ where: { status: "approved" } });
     const grievances = await prisma.complaint.count({ where: { status: "open" } });
-    const pending_certs = await prisma.certificate.findMany({ where: { status: "pending" }, include: { citizen: true }, orderBy: { submitted_at: 'desc' }, take: 3 });
-    const open_comps = await prisma.complaint.findMany({ where: { status: "open" }, include: { citizen: true }, orderBy: { submitted_at: 'desc' }, take: 3 });
+    const pending_certs = await prisma.certificate.findMany({ where: { status: "pending" }, include: { user_certificate_citizen_idTouser: true }, orderBy: { submitted_at: 'desc' }, take: 3 });
+    const open_comps = await prisma.complaint.findMany({ where: { status: "open" }, include: { user_complaint_citizen_idTouser: true }, orderBy: { submitted_at: 'desc' }, take: 3 });
     let action_required = [];
-    for (const cert of pending_certs) { action_required.push({ name: cert.citizen ? cert.citizen.full_name : "Citizen", type: `${cert.certificate_type.charAt(0).toUpperCase() + cert.certificate_type.slice(1)} Cert.`, urgency: "High", color: "text-rose-600", date: cert.submitted_at }); }
-    for (const comp of open_comps) { action_required.push({ name: comp.citizen ? comp.citizen.full_name : "Citizen", type: "Complaint Update", urgency: "Med", color: "text-amber-600", date: comp.submitted_at }); }
+    for (const cert of pending_certs) { action_required.push({ name: cert.user_certificate_citizen_idTouser ? cert.user_certificate_citizen_idTouser.full_name : "Citizen", type: `${cert.certificate_type.charAt(0).toUpperCase() + cert.certificate_type.slice(1)} Cert.`, urgency: "High", color: "text-rose-600", date: cert.submitted_at }); }
+    for (const comp of open_comps) { action_required.push({ name: comp.user_complaint_citizen_idTouser ? comp.user_complaint_citizen_idTouser.full_name : "Citizen", type: "Complaint Update", urgency: "Med", color: "text-amber-600", date: comp.submitted_at }); }
     action_required.sort((a, b) => new Date(b.date) - new Date(a.date));
     action_required = action_required.slice(0, 5);
     res.json({ stats: { total_citizens, pending_review, processed, grievances }, action_required });

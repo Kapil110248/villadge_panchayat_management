@@ -2,9 +2,16 @@ const { prisma } = require('../db');
 
 exports.getStaffAttendance = async (req, res) => {
   try {
-    const staff = await prisma.employee.findMany({ include: { attendance: true, leave_requests: true } });
+    const staffData = await prisma.employee.findMany({ include: { attendance: true, leaverequest: true } });
+    const staff = staffData.map(s => {
+      const { leaverequest, ...rest } = s;
+      return { ...rest, leave_requests: leaverequest };
+    });
     res.json(staff);
-  } catch (error) { res.status(500).json({ detail: "Internal Server Error" }); }
+  } catch (error) { 
+    console.error("Error in getStaffAttendance:", error);
+    res.status(500).json({ detail: "Internal Server Error" }); 
+  }
 };
 
 exports.markAttendance = async (req, res) => {

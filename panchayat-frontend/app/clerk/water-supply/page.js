@@ -19,6 +19,25 @@ export default function ClerkWaterSupply() {
   const [showTankForm, setShowTankForm] = useState(false);
   const [tankForm, setTankForm] = useState({ location: "", capacity: "", condition: "Good" });
 
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
+    try {
+      const token = localStorage.getItem("accessToken");
+      if (deleteConfirm.type === 'schedule') {
+        await api.delete(`/water-supply/${deleteConfirm.id}`, token);
+        setToastMessage("Water schedule deleted!");
+      } else {
+        await api.delete(`/water-supply/tanks/${deleteConfirm.id}`, token);
+        setToastMessage("Water tank deleted!");
+      }
+      setTimeout(() => setToastMessage(""), 3000);
+      fetchData();
+      setDeleteConfirm(null);
+    } catch (e) { alert(e.message); }
+  };
+
   const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => { fetchData(); }, []);
@@ -87,15 +106,8 @@ export default function ClerkWaterSupply() {
     } catch (e) { alert(e.message); }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this schedule?")) return;
-    try {
-      const token = localStorage.getItem("accessToken");
-      await api.delete(`/water-supply/${id}`, token);
-      setToastMessage("Water schedule deleted!");
-      setTimeout(() => setToastMessage(""), 3000);
-      fetchData();
-    } catch (e) { alert(e.message); }
+  const handleDelete = (id) => {
+    setDeleteConfirm({ id, type: 'schedule' });
   };
 
   const activeCount = schedules.filter(s => s.status === "active").length;
@@ -118,15 +130,8 @@ export default function ClerkWaterSupply() {
     } catch (e) { alert(e.message); }
   };
 
-  const handleDeleteTank = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this water tank?")) return;
-    try {
-      const token = localStorage.getItem("accessToken");
-      await api.delete(`/water-supply/tanks/${id}`, token);
-      setToastMessage("Water tank deleted!");
-      setTimeout(() => setToastMessage(""), 3000);
-      fetchData();
-    } catch (e) { alert(e.message); }
+  const handleDeleteTank = (id) => {
+    setDeleteConfirm({ id, type: 'tank' });
   };
 
   return (
@@ -414,6 +419,27 @@ export default function ClerkWaterSupply() {
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-sm shadow-2xl border-0 animate-in fade-in zoom-in duration-200">
+            <CardContent className="p-8 text-center space-y-6">
+              <div className="w-16 h-16 bg-rose-50 mx-auto rounded-full flex items-center justify-center">
+                <Trash2 className="w-8 h-8 text-rose-500" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">Delete {deleteConfirm.type === 'schedule' ? 'Schedule' : 'Tank'}?</h3>
+                <p className="text-sm text-slate-500 mt-2">This action cannot be undone.</p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+                <Button className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white" onClick={confirmDelete}>Delete</Button>
+              </div>
             </CardContent>
           </Card>
         </div>

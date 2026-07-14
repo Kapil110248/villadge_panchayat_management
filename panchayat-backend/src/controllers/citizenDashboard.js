@@ -13,20 +13,65 @@ exports.getDashboardStats = async (req, res) => {
       take: 5
     });
 
-    const applied_certificates = await prisma.certificate.count({ where: { citizen_id: citizenId } });
-    const approved_certificates = await prisma.certificate.count({ where: { citizen_id: citizenId, status: 'approved' } });
-    const pending_certificates = await prisma.certificate.count({ where: { citizen_id: citizenId, status: 'pending' } });
-
+    const certCounts = await prisma.certificate.groupBy({
+      by: ['status'],
+      where: { citizen_id: citizenId },
+      _count: true
+    });
+    
     // Complaints
-    const active_complaints = await prisma.complaint.count({ where: { citizen_id: citizenId, status: { in: ['open', 'in_progress'] } } });
+    const allComplaints = await prisma.complaint.findMany({
+      where: { citizen_id: citizenId },
+      orderBy: { submitted_at: 'desc' },
+      take: 5
+    });
 
-    // Format recent activities
-    const recentActivities = allCertificates.map(cert => ({
-      title: `${cert.certificate_type} Certificate`,
-      time: cert.submitted_at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      status: cert.status.charAt(0).toUpperCase() + cert.status.slice(1),
-      type: "Certificate"
-    }));
+    const compCounts = await prisma.complaint.groupBy({
+      by: ['status'],
+      where: { citizen_id: citizenId },
+      _count: true
+    });
+
+    let applied = 0, active = 0, approved = 0, pending = 0;
+    
+    // Process Certificate Counts
+    certCounts.forEach(c => {
+      applied += c._count;
+      if (c.status === 'approved') approved += c._count;
+      if (c.status === 'pending') pending += c._count;
+    });
+
+    // Process Complaint Counts
+    compCounts.forEach(c => {
+      applied += c._count;
+      if (c.status === 'open' || c.status === 'in_progress') active += c._count;
+      if (c.status === 'resolved') approved += c._count;
+      if (c.status === 'open') pending += c._count;
+    });
+
+    // Format recent activities (combine and sort)
+    const recentActivitiesRaw = [
+      ...allCertificates.map(cert => ({
+        title: `${cert.certificate_type} Certificate`,
+        dateObj: cert.submitted_at,
+        time: cert.submitted_at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        status: cert.status.charAt(0).toUpperCase() + cert.status.slice(1),
+        type: "Certificate"
+      })),
+      ...allComplaints.map(comp => ({
+        title: comp.title || comp.category || "Complaint",
+        dateObj: comp.submitted_at,
+        time: comp.submitted_at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        status: comp.status.charAt(0).toUpperCase() + comp.status.slice(1),
+        type: "Complaint"
+      }))
+    ];
+    
+    // Sort combined activities by date descending and take top 5
+    const recentActivities = recentActivitiesRaw
+      .sort((a, b) => b.dateObj - a.dateObj)
+      .slice(0, 5)
+      .map(({ dateObj, ...rest }) => rest);
 
     // Fetch latest notice
     const latestNotice = await prisma.notice.findFirst({
@@ -58,10 +103,10 @@ exports.getDashboardStats = async (req, res) => {
 
     res.json({
       stats: {
-        applied: applied_certificates,
-        active: active_complaints,
-        approved: approved_certificates,
-        pending: pending_certificates
+        applied: applied,
+        active: active,
+        approved: approved,
+        pending: pending
       },
       recentActivities,
       latestNotice,
@@ -217,7 +262,7 @@ exports.applyScheme = async (req, res) => {
         scheme_id,
         citizen_id: req.user.id,
         status: "Pending",
-        form_data: form_data || null
+        form_data: form_data ? JSON.stringify(form_data) : null
       }
     });
     
@@ -246,7 +291,11 @@ exports.getMyApplications = async (req, res) => {
       include: { scheme: true },
       orderBy: { submitted_at: 'desc' }
     });
-    res.json({ applications });
+    const formattedApplications = applications.map(app => ({
+      ...app,
+      form_data: (typeof app.form_data === 'string' && app.form_data.trim() !== '') ? JSON.parse(app.form_data) : app.form_data
+    }));
+    res.json({ applications: formattedApplications });
   } catch (error) {
     console.error(error);
     res.status(500).json({ detail: "Internal Server Error" });
@@ -297,16 +346,16 @@ exports.getProfile = async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
       include: {
-        profile: true,
-        family: {
+        citizenprofile: true,
+        family_user_family_member_idTofamily: {
           include: {
-            head: { include: { profile: true } },
-            members: { include: { profile: true } }
+            user_family_head_idTouser: { include: { citizenprofile: true } },
+            user_user_family_member_idTofamily: { include: { citizenprofile: true } }
           }
         },
-        family_head: {
+        family_family_head_idTouser: {
           include: {
-            members: { include: { profile: true } }
+            user_user_family_member_idTofamily: { include: { citizenprofile: true } }
           }
         }
       }
@@ -317,20 +366,20 @@ exports.getProfile = async (req, res) => {
     }
 
     let members = [];
-    if (user.family_head) {
-      members = user.family_head.members.map(m => ({
+    if (user.family_family_head_idTouser) {
+      members = user.family_family_head_idTouser.user_user_family_member_idTofamily.map(m => ({
         id: m.id,
         name: m.full_name,
         email: m.email,
         mobile: m.mobile || "",
         dob: m.date_of_birth ? new Date(m.date_of_birth).toISOString().split('T')[0] : "",
-        gender: (m.profile && m.profile.gender) || "male",
+        gender: (m.citizenprofile && m.citizenprofile.gender) || "male",
         relation: m.bio || "Family Member",
         age: m.date_of_birth ? new Date().getFullYear() - new Date(m.date_of_birth).getFullYear() : "N/A",
-        avatar_url: m.avatar_url || (m.profile && m.profile.avatar_url) || null
+        avatar_url: m.avatar_url || (m.citizenprofile && m.citizenprofile.avatar_url) || null
       }));
-    } else if (user.family) {
-      const head = user.family.head;
+    } else if (user.family_user_family_member_idTofamily) {
+      const head = user.family_user_family_member_idTofamily.user_family_head_idTouser;
       members = [
         {
           id: head.id,
@@ -338,21 +387,21 @@ exports.getProfile = async (req, res) => {
           email: head.email,
           mobile: head.mobile || "",
           dob: head.date_of_birth ? new Date(head.date_of_birth).toISOString().split('T')[0] : "",
-          gender: (head.profile && head.profile.gender) || "male",
+          gender: (head.citizenprofile && head.citizenprofile.gender) || "male",
           relation: "Family Head",
           age: head.date_of_birth ? new Date().getFullYear() - new Date(head.date_of_birth).getFullYear() : "N/A",
-          avatar_url: head.avatar_url || (head.profile && head.profile.avatar_url) || null
+          avatar_url: head.avatar_url || (head.citizenprofile && head.citizenprofile.avatar_url) || null
         },
-        ...user.family.members.filter(m => m.id !== user.id).map(m => ({
+        ...user.family_user_family_member_idTofamily.user_user_family_member_idTofamily.filter(m => m.id !== user.id).map(m => ({
           id: m.id,
           name: m.full_name,
           email: m.email,
           mobile: m.mobile || "",
           dob: m.date_of_birth ? new Date(m.date_of_birth).toISOString().split('T')[0] : "",
-          gender: (m.profile && m.profile.gender) || "male",
+          gender: (m.citizenprofile && m.citizenprofile.gender) || "male",
           relation: m.bio || "Family Member",
           age: m.date_of_birth ? new Date().getFullYear() - new Date(m.date_of_birth).getFullYear() : "N/A",
-          avatar_url: m.avatar_url || (m.profile && m.profile.avatar_url) || null
+          avatar_url: m.avatar_url || (m.citizenprofile && m.citizenprofile.avatar_url) || null
         }))
       ];
     }
@@ -360,20 +409,22 @@ exports.getProfile = async (req, res) => {
     res.json({
       user: {
         id: user.id,
-        email: user.email,
         full_name: user.full_name,
+        email: user.email,
         mobile: user.mobile,
-        avatar_url: user.avatar_url || (user.profile && user.profile.avatar_url) || null,
-        date_of_birth: user.date_of_birth || (user.profile && user.profile.date_of_birth) || null,
-        address: user.address || (user.profile && user.profile.address) || null,
-        bio: user.bio || null,
+        avatar_url: user.avatar_url || (user.citizenprofile && user.citizenprofile.avatar_url) || null,
+        date_of_birth: user.date_of_birth ? new Date(user.date_of_birth).toISOString().split('T')[0] : null,
+        created_at: user.created_at,
+        bio: user.bio,
+        is_active: user.is_active,
+        address: user.address || (user.citizenprofile && user.citizenprofile.address) || null
       },
-      profile: user.profile ? {
-        aadhaar_number: user.profile.aadhaar_number,
-        village: user.profile.village || "Sarahi",
-        pincode: user.profile.pincode,
-        gender: user.profile.gender,
-        father_name: user.profile.father_name || ""
+      profile: user.citizenprofile ? {
+        aadhaar_number: user.citizenprofile.aadhaar_number,
+        village: user.citizenprofile.village || "Sarahi",
+        pincode: user.citizenprofile.pincode,
+        gender: user.citizenprofile.gender,
+        father_name: user.citizenprofile.father_name || ""
       } : {
         aadhaar_number: "Not Linked",
         village: "Sarahi",
@@ -410,7 +461,7 @@ exports.updateProfile = async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { profile: true }
+      include: { citizenprofile: true }
     });
 
     if (!user) {
@@ -458,9 +509,9 @@ exports.updateProfile = async (req, res) => {
       profileData.aadhaar_number = aadhaar_number;
     }
 
-    if (user.profile) {
+    if (user.citizenprofile) {
       await prisma.citizenProfile.update({
-        where: { id: user.profile.id },
+        where: { id: user.citizenprofile.id },
         data: profileData
       });
     } else {
@@ -497,14 +548,14 @@ exports.addFamilyMember = async (req, res) => {
     if (!family) {
       const headUser = await prisma.user.findUnique({
         where: { id: headId },
-        include: { profile: true }
+        include: { citizenprofile: true }
       });
 
       family = await prisma.family.create({
         data: {
           head_id: headId,
-          ward_number: (headUser.profile && headUser.profile.village) || "Sarahi",
-          address: headUser.address || (headUser.profile && headUser.profile.address) || "Sarahi Village"
+          ward_number: (headUser.citizenprofile && headUser.citizenprofile.village) || "Sarahi",
+          address: headUser.address || (headUser.citizenprofile && headUser.citizenprofile.address) || "Sarahi Village"
         }
       });
     }
@@ -536,7 +587,7 @@ exports.addFamilyMember = async (req, res) => {
         bio: relation || "Family Member",
         family_member_id: family.id,
         avatar_url: avatar_url || null,
-        profile: {
+        citizenprofile: {
           create: {
             aadhaar_number: `MEMBER-${uuidv4().substring(0, 8)}`,
             gender: gender ? gender.toLowerCase() : "male",
@@ -572,7 +623,7 @@ exports.updateFamilyMember = async (req, res) => {
 
     const member = await prisma.user.findFirst({
       where: { id: memberId, family_member_id: family.id },
-      include: { profile: true }
+      include: { citizenprofile: true }
     });
 
     if (!member) {
@@ -605,9 +656,9 @@ exports.updateFamilyMember = async (req, res) => {
     if (dob !== undefined) profileUpdateData.date_of_birth = dob ? new Date(dob) : null;
     if (avatar_url !== undefined) profileUpdateData.avatar_url = avatar_url;
 
-    if (member.profile) {
+    if (member.citizenprofile) {
       await prisma.citizenProfile.update({
-        where: { id: member.profile.id },
+        where: { id: member.citizenprofile.id },
         data: profileUpdateData
       });
     } else {

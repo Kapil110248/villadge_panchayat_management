@@ -260,7 +260,7 @@ exports.getComplaints = async (req, res) => {
         citizen_mobile: citizen ? citizen.mobile : "N/A",
         category: c.complaint_type, date: c.submitted_at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
         status: statusStr === "in_progress" ? "In Progress" : statusStr === "resolution_proposed" ? "Resolution Proposed" : statusStr.charAt(0).toUpperCase() + statusStr.slice(1),
-        urgent: c.priority.toLowerCase() === "high", description: c.description, image_url: c.image_url,
+        urgent: c.priority.toLowerCase() === "high", subject: c.subject, description: c.description, image_url: c.image_url,
         admin_reply: c.admin_reply, resolution_image_url: c.resolution_image_url
       };
     });
@@ -291,8 +291,8 @@ exports.updateComplaintStatus = async (req, res) => {
       await prisma.citizenNotification.create({
         data: {
           citizen_id: complaint.citizen_id,
-          title: "Complaint Resolution Proposed",
-          message: `Your complaint (${complaint.complaint_number}) has been marked as resolved by the admin. Please review the details and confirm.`,
+          title: "Complaint Resolved",
+          message: `Your complaint (${complaint.complaint_number}) has been resolved! Message: "${message}"`,
           type: "complaint_update",
           action_url: "/citizen/complaints/status"
         }
@@ -302,6 +302,9 @@ exports.updateComplaintStatus = async (req, res) => {
     }
     
     // Default status update
+    if (statusVal === "resolved" || statusVal === "closed") {
+      return res.status(400).json({ detail: "Complaints cannot be resolved directly from here. Please use the 'Resolve (with proof)' option to provide a photo and message." });
+    }
     const complaint = await prisma.complaint.update({ where: { id }, data: { status: statusVal } });
     
     // Notify the citizen of general status update
@@ -507,7 +510,30 @@ exports.getReportStats = async (req, res) => {
     const completion_rate = total_complaints > 0 ? Number(((resolved_complaints / total_complaints) * 100).toFixed(1)) : 0;
     const cert_approval_rate = total_certificates > 0 ? Number(((approved_certificates / total_certificates) * 100).toFixed(1)) : 0;
     
-    res.json({ total_citizens, total_complaints, resolved_complaints, open_complaints, total_certificates, approved_certificates, total_schemes, active_schemes, total_notices, completion_rate, cert_approval_rate });
+    // Generate Chart Data (Last 6 Months Trend)
+    const allComplaints = await prisma.complaint.findMany({ select: { submitted_at: true, status: true } });
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const chartDataMap = {};
+    
+    for (let i = 5; i >= 0; i--) {
+       const d = new Date();
+       d.setMonth(d.getMonth() - i);
+       chartDataMap[`${monthNames[d.getMonth()]} ${d.getFullYear()}`] = { name: `${monthNames[d.getMonth()]}`, received: 0, resolved: 0 };
+    }
+    
+    allComplaints.forEach(c => {
+       const d = new Date(c.submitted_at);
+       const key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+       if(chartDataMap[key]) {
+           chartDataMap[key].received += 1;
+           if(c.status === 'resolved' || c.status === 'closed') {
+               chartDataMap[key].resolved += 1;
+           }
+       }
+    });
+    const chartData = Object.values(chartDataMap);
+
+    res.json({ total_citizens, total_complaints, resolved_complaints, open_complaints, total_certificates, approved_certificates, total_schemes, active_schemes, total_notices, completion_rate, cert_approval_rate, chartData });
   } catch (error) {
     res.status(500).json({ detail: "Internal Server Error" });
   }
@@ -517,11 +543,11 @@ exports.getGramSabha = async (req, res) => {
   try {
     const meetings = await prisma.gramSabhaMeeting.findMany({ 
       include: { 
-        suggestions: { 
+        sabhasuggestion: { 
           include: { 
-            citizen: true,
-            replies: { 
-              include: { citizen: true }, 
+            user: true,
+            sabhasuggestionreply: { 
+              include: { user: true }, 
               orderBy: { created_at: 'asc' } 
             } 
           } 
@@ -529,8 +555,23 @@ exports.getGramSabha = async (req, res) => {
       }, 
       orderBy: { date_time: 'desc' } 
     });
-    res.json(meetings);
+    
+    // Map sabhasuggestion to suggestions for frontend compatibility
+    const formattedMeetings = meetings.map(m => ({
+      ...m,
+      suggestions: m.sabhasuggestion.map(s => ({
+        ...s,
+        citizen: s.user,
+        replies: s.sabhasuggestionreply.map(r => ({
+          ...r,
+          citizen: r.user
+        }))
+      }))
+    }));
+    
+    res.json(formattedMeetings);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ detail: "Internal Server Error" });
   }
 };
@@ -589,7 +630,7 @@ exports.getSchemeApplications = async (req, res) => {
       citizen_email: app.user.email,
       status: app.status,
       submitted_at: app.submitted_at.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-      form_data: app.form_data,
+      form_data: (typeof app.form_data === 'string' && app.form_data.trim() !== '') ? JSON.parse(app.form_data) : app.form_data,
       admin_remarks: app.admin_remarks,
       result_file: app.result_file
     }));
@@ -865,6 +906,81 @@ exports.updateAdminProfile = async (req, res) => {
     
     fs.writeFileSync(configPath, JSON.stringify(newConfig, null, 2), 'utf8');
     res.json({ message: "Admin profile updated successfully", config: newConfig });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+exports.getReportData = async (req, res) => {
+  try {
+    const { type } = req.query;
+    if (type === 'revenue') {
+      const records = await prisma.taxRecord.findMany({
+        include: { user: { select: { full_name: true } } },
+        orderBy: { created_at: 'desc' }
+      });
+      return res.json({ records });
+    }
+    if (type === 'schemes') {
+      const applications = await prisma.schemeApplication.findMany({
+        include: { 
+          scheme: { select: { scheme_name: true, category: true } },
+          user: { select: { full_name: true } }
+        },
+        orderBy: { submitted_at: 'desc' }
+      });
+      return res.json({ applications });
+    }
+    if (type === 'grievance') {
+      const complaints = await prisma.complaint.findMany({
+        include: { user_complaint_citizen_idTouser: { select: { full_name: true } } },
+        orderBy: { submitted_at: 'desc' }
+      });
+      return res.json({ complaints });
+    }
+    if (type === 'population') {
+      const citizens = await prisma.user.findMany({
+        where: { 
+          role: 'citizen',
+          family_member_id: null
+        },
+        select: { 
+          full_name: true, 
+          created_at: true, 
+          mobile: true, 
+          is_active: true,
+          family_family_head_idTouser: {
+            select: {
+              user_user_family_member_idTofamily: {
+                select: { full_name: true }
+              }
+            }
+          }
+        },
+        orderBy: { created_at: 'desc' }
+      });
+      
+      const mappedCitizens = citizens.map(c => {
+         let count = 1;
+         let membersList = [];
+         if (c.family_family_head_idTouser && c.family_family_head_idTouser.user_user_family_member_idTofamily) {
+             const members = c.family_family_head_idTouser.user_user_family_member_idTofamily;
+             count += members.length;
+             membersList = members.map(m => m.full_name);
+         }
+         return {
+            full_name: c.full_name,
+            created_at: c.created_at,
+            mobile: c.mobile,
+            is_active: c.is_active,
+            family_members_count: count,
+            family_members_list: membersList
+         };
+      });
+      return res.json({ citizens: mappedCitizens });
+    }
+    return res.status(400).json({ detail: "Invalid report type" });
   } catch (error) {
     console.error(error);
     res.status(500).json({ detail: "Internal Server Error" });
