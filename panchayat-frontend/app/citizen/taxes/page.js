@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CreditCard, Receipt, ShieldCheck, HelpCircle, AlertCircle, Clock, CheckCircle, AlertTriangle, X, QrCode } from "lucide-react";
+import { SiPaytm } from "react-icons/si";
 import { api } from "@/lib/api";
 
 export default function CitizenTaxes() {
@@ -475,12 +476,12 @@ export default function CitizenTaxes() {
                 <h3 className="text-xl font-black text-slate-900">Scan & Pay</h3>
                 <p className="text-xs text-slate-500 mt-1 capitalize">{selectedTax.tax_type} Tax Payment</p>
               </div>
-              <button onClick={() => setShowPayModal(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm border border-slate-200">
+              <button type="button" onClick={() => setShowPayModal(false)} className="w-8 h-8 flex items-center justify-center bg-white rounded-full text-slate-400 hover:text-slate-600 shadow-sm border border-slate-200">
                 <X className="w-4 h-4" />
               </button>
             </div>
             
-            <form onSubmit={submitPayment} className="p-6 space-y-6 overflow-y-auto">
+            <div className="p-6 space-y-6 overflow-y-auto">
               
               <div className="text-center space-y-4">
                 <div className="bg-emerald-50 text-emerald-700 py-3 rounded-2xl border border-emerald-100">
@@ -512,6 +513,13 @@ export default function CitizenTaxes() {
               <div className="grid grid-cols-2 gap-3 mt-2">
                 <a 
                   href={`gpay://upi/pay?pa=${taxConfig?.upi_id}&pn=${encodeURIComponent(taxConfig?.account_name || 'Panchayat')}&am=${selectedTax ? calculateTaxPenalty(selectedTax).total.toFixed(2) : 0}&cu=INR&tn=${encodeURIComponent((selectedTax?.tax_type || '') + ' Tax')}`}
+                  onClick={(e) => {
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    if (!isMobile) {
+                      e.preventDefault();
+                      alert("Google Pay link only works on mobile devices. Please scan the QR code above with your phone to pay.");
+                    }
+                  }}
                   className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:border-emerald-500 hover:bg-emerald-50 transition-all text-slate-700"
                 >
                   <img src="https://upload.wikimedia.org/wikipedia/commons/f/f2/Google_Pay_Logo.svg" alt="GPay" className="h-6 mb-2 object-contain" />
@@ -519,6 +527,13 @@ export default function CitizenTaxes() {
                 </a>
                 <a 
                   href={`phonepe://pay?pa=${taxConfig?.upi_id}&pn=${encodeURIComponent(taxConfig?.account_name || 'Panchayat')}&am=${selectedTax ? calculateTaxPenalty(selectedTax).total.toFixed(2) : 0}&cu=INR&tn=${encodeURIComponent((selectedTax?.tax_type || '') + ' Tax')}`}
+                  onClick={(e) => {
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    if (!isMobile) {
+                      e.preventDefault();
+                      alert("PhonePe link only works on mobile devices. Please scan the QR code above with your phone to pay.");
+                    }
+                  }}
                   className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:border-indigo-500 hover:bg-indigo-50 transition-all text-slate-700"
                 >
                   <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/PhonePe_Logo.svg" alt="PhonePe" className="h-6 mb-2 object-contain" />
@@ -526,13 +541,27 @@ export default function CitizenTaxes() {
                 </a>
                 <a 
                   href={`paytmmp://pay?pa=${taxConfig?.upi_id}&pn=${encodeURIComponent(taxConfig?.account_name || 'Panchayat')}&am=${selectedTax ? calculateTaxPenalty(selectedTax).total.toFixed(2) : 0}&cu=INR&tn=${encodeURIComponent((selectedTax?.tax_type || '') + ' Tax')}`}
+                  onClick={(e) => {
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    if (!isMobile) {
+                      e.preventDefault();
+                      alert("Paytm link only works on mobile devices. Please scan the QR code above with your phone to pay.");
+                    }
+                  }}
                   className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:border-cyan-500 hover:bg-cyan-50 transition-all text-slate-700"
                 >
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/c/cd/Paytm_logo.svg" alt="Paytm" className="h-4 mb-2 object-contain" />
+                  <SiPaytm className="h-4 w-12 mb-2 text-[#00B9F1]" />
                   <span className="text-xs font-bold">Paytm</span>
                 </a>
                 <a 
                   href={`upi://pay?pa=${taxConfig?.upi_id}&pn=${encodeURIComponent(taxConfig?.account_name || 'Panchayat')}&am=${selectedTax ? calculateTaxPenalty(selectedTax).total.toFixed(2) : 0}&cu=INR&tn=${encodeURIComponent((selectedTax?.tax_type || '') + ' Tax')}`}
+                  onClick={(e) => {
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    if (!isMobile) {
+                      e.preventDefault();
+                      alert("UPI link only works on mobile devices. Please scan the QR code above with your phone to pay.");
+                    }
+                  }}
                   className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 hover:bg-slate-50 transition-all text-slate-700"
                 >
                   <div className="h-6 mb-2 flex items-center justify-center text-slate-600 font-black">UPI</div>
@@ -541,13 +570,13 @@ export default function CitizenTaxes() {
               </div>
 
               <div className="pt-4 border-t border-slate-100">
-                <Button type="button" onClick={() => submitPayment()} disabled={payingTaxId !== null} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-xl shadow-emerald-500/20 disabled:opacity-50">
+                <Button type="button" onClick={() => submitPayment({preventDefault: () => {}})} disabled={payingTaxId !== null} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-xl shadow-emerald-500/20 disabled:opacity-50">
                   {payingTaxId !== null ? "Submitting..." : "I have paid successfully"}
                 </Button>
                 <p className="text-[10px] text-center text-slate-400 mt-2">Click above only after you have completed the payment via your UPI app.</p>
               </div>
 
-            </form>
+            </div>
           </div>
         </div>
       )}

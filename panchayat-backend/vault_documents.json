@@ -8,5 +8,15 @@
       "url": "https://res.cloudinary.com/dw48hcxi5/image/upload/v1782401528/panchayat_documents/puqpfseubbqk92ykzu5c.pdf",
       "docType": "Aadhaar Card"
     }
+  ],
+  "000000000000000000000003": [
+    {
+      "name": "Screenshot 2026-06-25 111032",
+      "status": "Verified",
+      "icon": "Shield",
+      "color": "text-emerald-400",
+      "url": "https://res.cloudinary.com/dw48hcxi5/image/upload/v1784277998/panchayat_documents/g1e3dxwpu1tldx35vkbe.png",
+      "docType": "Aadhaar Card"
+    }
   ]
 }

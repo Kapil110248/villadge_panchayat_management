@@ -16,6 +16,7 @@ router.post('/clerks', adminController.createClerk);
 router.get('/clerks/:id/messages', adminController.getClerkMessages);
 router.post('/clerks/:id/message', adminController.sendClerkMessage);
 router.put('/clerks/:id/status', adminController.updateClerkStatus);
+router.put('/clerks/:id', adminController.updateClerk);
 router.delete('/clerks/:id', adminController.deleteClerk);
 router.get('/complaints', adminController.getComplaints);
 router.put('/complaints/:id/status', adminController.updateComplaintStatus);

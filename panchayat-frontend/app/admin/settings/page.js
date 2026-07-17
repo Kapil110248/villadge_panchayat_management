@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/Input";
 import { Settings, Shield, Bell, Globe, User, Save } from "lucide-react";
 
 export default function AdminSettings() {
+
   return (
     <div className="space-y-8">
       <div>

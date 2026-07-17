@@ -42,7 +42,7 @@ export default function LoginPage() {
         localStorage.setItem("userId", response.user.id);
         if (response.user.avatar_url) localStorage.setItem("userAvatar", response.user.avatar_url);
         
-        router.push("/citizen/dashboard");
+        window.location.href = "/citizen/dashboard";
       } catch (error) {
         console.error("Login failed:", error);
         showToast(error.message || "Invalid credentials or account not approved.");
@@ -63,10 +63,11 @@ export default function LoginPage() {
         localStorage.setItem("userEmail", email);
         localStorage.setItem("userName", response.user.name);
         localStorage.setItem("userId", response.user.id);
+        localStorage.setItem("user", JSON.stringify(response.user));
         if (response.user.avatar_url) localStorage.setItem("userAvatar", response.user.avatar_url);
         
-        if (role === "admin") router.push("/admin/dashboard");
-        else if (role === "clerk") router.push("/clerk/dashboard");
+        if (role === "admin") window.location.href = "/admin/dashboard";
+        else if (role === "clerk") window.location.href = "/clerk/dashboard";
       } catch (error) {
         console.error("Login failed:", error);
         showToast(error.message || "Invalid credentials.");

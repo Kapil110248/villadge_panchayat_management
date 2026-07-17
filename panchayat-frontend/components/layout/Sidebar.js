@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
@@ -42,7 +43,6 @@ const getLinks = (role) => {
     { name: "Ration Schedule", href: "/citizen/ration", icon: BookOpen },
     { name: "Health Camps", href: "/citizen/health-camps", icon: ClipboardCheck },
     { name: "Agriculture Center", href: "/citizen/agriculture", icon: BookOpen },
-    { name: "Digital Village Map", href: "/citizen/map", icon: FileSearch },
   ];
 
   const clerkLinks = [
@@ -58,6 +58,7 @@ const getLinks = (role) => {
     { name: "Village Directory", href: "/clerk/directory", icon: Users },
     { name: "Assets Ledger", href: "/clerk/assets", icon: FileSearch },
     { name: "Staff Attendance", href: "/clerk/attendance", icon: ClipboardCheck },
+    { name: "Ration Schedule", href: "/clerk/ration", icon: BookOpen },
     { name: "Agriculture Entry", href: "/admin/agriculture", icon: Tractor },
   ];
 
@@ -78,7 +79,6 @@ const getLinks = (role) => {
     { name: "Tax Center", href: "/admin/taxes", icon: FileText },
     { name: "Village Directory", href: "/admin/directory", icon: Users },
     { name: "Suggestions Box", href: "/admin/suggestions", icon: Sparkles },
-    { name: "Ration Schedule", href: "/admin/ration", icon: BookOpen },
     { name: "Health Camps", href: "/admin/health-camps", icon: ClipboardCheck },
     { name: "Assets Ledger", href: "/admin/assets", icon: FileSearch },
     { name: "Staff Attendance", href: "/admin/attendance", icon: ClipboardCheck },
@@ -96,7 +96,31 @@ const getLinks = (role) => {
 
 export function Sidebar({ role = "citizen", onClose }) {
   const pathname = usePathname();
-  const links = getLinks(role);
+  const [permissions, setPermissions] = useState([]);
+
+  useEffect(() => {
+    try {
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const userObj = JSON.parse(userStr);
+        if (userObj.permissions) {
+          setPermissions(userObj.permissions);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const rawLinks = getLinks(role);
+  
+  // Filter for RBAC (Clerks only)
+  const links = rawLinks.filter(link => {
+    if (role !== "clerk") return true;
+    if (link.name === "Dashboard" || link.name === "Profile Settings" || link.name === "Notices") return true;
+    if (!permissions) return false;
+    return permissions.includes(link.name);
+  });
 
   return (
     <div className="w-72 glass border-r border-slate-200/50 h-screen sticky top-0 flex flex-col z-50">

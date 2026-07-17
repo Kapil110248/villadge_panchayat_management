@@ -18,6 +18,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { api } from "@/lib/api";
+import Link from "next/link";
 
 export default function CitizenRation() {
   const [schedules, setSchedules] = useState([]);
@@ -133,14 +134,23 @@ export default function CitizenRation() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column: Schedules list */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-emerald-500" />
-              Active Distribution Schedules
-            </h2>
-            <span className="text-xs bg-slate-100 text-slate-600 font-bold px-3 py-1 rounded-full">
-              {schedules.length} Active
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-emerald-500" />
+                Active Distribution Schedules
+              </h2>
+              <span className="text-xs bg-slate-100 text-slate-600 font-bold px-3 py-1 rounded-full">
+                {schedules.length} Active
+              </span>
+            </div>
+            <Link 
+              href="/citizen/ration/history" 
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 rounded-xl text-sm font-semibold transition-all shadow-sm self-start sm:self-auto"
+            >
+              <Clock className="w-4 h-4" />
+              View History
+            </Link>
           </div>
 
           {loading ? (
@@ -198,6 +208,22 @@ export default function CitizenRation() {
                       </div>
                     </div>
                   </div>
+
+                  {sched.last_date && (
+                    <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-4">
+                      <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center shrink-0">
+                        <AlertCircle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Important Alert</p>
+                        <p className="text-sm font-bold text-rose-900">
+                          Last Date for Distribution: {new Date(sched.last_date).toLocaleDateString("en-IN", { 
+                            weekday: "long", year: "numeric", month: "long", day: "numeric" 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100">

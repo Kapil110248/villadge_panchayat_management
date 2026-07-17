@@ -13,7 +13,8 @@ export default function LogoutPage() {
     localStorage.removeItem("userName");
     localStorage.removeItem("userId");
     localStorage.removeItem("userAvatar");
-    router.push("/login");
+    localStorage.removeItem("user");
+    window.location.href = "/login";
   }, [router]);
 
   return (

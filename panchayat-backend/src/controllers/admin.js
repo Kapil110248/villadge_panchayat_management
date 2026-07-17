@@ -116,6 +116,7 @@ exports.getClerks = async (req, res) => {
       id: clerk.id, name: clerk.full_name, email: clerk.email, mobile: clerk.mobile,
       status: clerk.is_active ? "Active" : "Inactive", village: "Panchayat Office",
       avatar_url: clerk.avatar_url,
+      permissions: clerk.permissions || [],
       tasksHandled: clerk.certificate_certificate_processed_by_idTouser ? clerk.certificate_certificate_processed_by_idTouser.length : 0
     }));
     res.json({ clerks: result });
@@ -134,6 +135,7 @@ exports.createClerk = async (req, res) => {
       data: {
         full_name: data.full_name, email: data.email, mobile: data.mobile,
         password_hash: getPasswordHash(data.password), role: "clerk", is_active: true,
+        permissions: data.permissions || [],
         updated_at: new Date()
       }
     });
@@ -217,6 +219,59 @@ exports.deleteClerk = async (req, res) => {
     res.json({ message: "Clerk removed successfully" });
   } catch (error) {
     console.error("deleteClerk Error:", error);
+    res.status(500).json({ detail: "Internal Server Error" });
+  }
+};
+
+exports.updateClerk = async (req, res) => {
+  try {
+    const clerkId = req.params.id;
+    const data = req.body;
+    
+    const existing = await prisma.user.findUnique({ where: { id: clerkId } });
+    if (!existing) return res.status(404).json({ detail: "Clerk not found" });
+    
+    // Check email uniqueness if email is changed
+    if (data.email && data.email !== existing.email) {
+      const emailCheck = await prisma.user.findUnique({ where: { email: data.email } });
+      if (emailCheck) return res.status(400).json({ detail: "Email already in use" });
+    }
+    
+    const updateData = {
+      full_name: data.full_name || existing.full_name,
+      email: data.email || existing.email,
+      mobile: data.mobile || existing.mobile,
+      updated_at: new Date()
+    };
+    
+    if (data.permissions !== undefined) {
+      updateData.permissions = data.permissions;
+    }
+    
+    if (data.password) {
+      const { getPasswordHash } = require('./auth'); // fallback if needed, but it's already imported
+      updateData.password_hash = getPasswordHash(data.password);
+    }
+    
+    const updatedUser = await prisma.user.update({
+      where: { id: clerkId },
+      data: updateData
+    });
+    
+    // update employee name if changed
+    if (data.full_name && data.full_name !== existing.full_name) {
+      const employee = await prisma.employee.findFirst({ where: { user_id: clerkId } });
+      if (employee) {
+        await prisma.employee.update({
+          where: { id: employee.id },
+          data: { name: data.full_name }
+        });
+      }
+    }
+    
+    res.json({ message: "Clerk updated successfully", clerk: updatedUser });
+  } catch (error) {
+    console.error("updateClerk Error:", error);
     res.status(500).json({ detail: "Internal Server Error" });
   }
 };

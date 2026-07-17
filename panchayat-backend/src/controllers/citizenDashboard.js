@@ -6,6 +6,13 @@ exports.getDashboardStats = async (req, res) => {
   try {
     const citizenId = req.user.id;
 
+    // Fetch user's village
+    const profile = await prisma.citizenProfile.findUnique({
+      where: { user_id: citizenId },
+      select: { village: true }
+    });
+    const villageName = profile?.village || "Sarahi";
+
     // Certificates
     const allCertificates = await prisma.certificate.findMany({
       where: { citizen_id: citizenId },
@@ -108,6 +115,7 @@ exports.getDashboardStats = async (req, res) => {
         approved: approved,
         pending: pending
       },
+      villageName,
       recentActivities,
       latestNotice,
       villageStats: {

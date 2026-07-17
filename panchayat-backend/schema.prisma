@@ -281,6 +281,7 @@ model RationSchedule {
   special_instructions String?  
   status               String   @default("active")
   contact_number       String?
+  last_date            DateTime?
   @@map("rationschedule")
 }
 
@@ -433,7 +434,8 @@ model User {
   mobile                                              String?
   is_active                                           Boolean                @default(true)
   created_at                                          DateTime               @default(now())
-  updated_at                                          DateTime
+  updated_at                                          DateTime               @updatedAt
+  permissions                                         String[]               @default([])
   family_member_id String? @db.ObjectId
   address                                             String?                
   avatar_url                                          String?
@@ -552,4 +554,14 @@ enum registrationrequest_status {
   pending
   approved
   rejected
+}
+
+model RationConfig {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  card_type   String   @unique // "APL", "BPL", "AAY"
+  wheat       Float
+  rice        Float
+  sugar       Float
+  updated_at  DateTime @default(now())
+  @@map("rationconfig")
 }

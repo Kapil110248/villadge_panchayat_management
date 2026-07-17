@@ -126,12 +126,12 @@ exports.login = async (req, res) => {
         return res.status(401).json({ detail: "Invalid credentials" });
       }
       
-      const token = createAccessToken({ sub: user.email, role: user.role, id: user.id });
+      const token = createAccessToken({ sub: user.email, role: user.role, id: user.id, permissions: user.permissions || [] });
       return res.json({
         access_token: token,
         token_type: "bearer",
         role: user.role,
-        user: { name: user.full_name, id: user.id, avatar_url: user.avatar_url }
+        user: { name: user.full_name, id: user.id, avatar_url: user.avatar_url, permissions: user.permissions || [] }
       });
     }
   } catch (error) {
